@@ -8,9 +8,7 @@ This project was inspired by and built upon the foundational work of [ralouta/Ar
 
 ## Demo
 
-A live demo is hosted on AWS S3:
-
-**[Imagery Data Assistant Demo](https://esri-imagery-apps.s3.dualstack.us-west-1.amazonaws.com/apps/imagery-assistant/index.html)**
+A live demo is hosted on AWS S3: **[Imagery Data Assistant Demo](https://esri-imagery-apps.s3.dualstack.us-west-1.amazonaws.com/apps/imagery-assistant/index.html)**
 
 Sign in with your ArcGIS Online account to explore the full capabilities — search for imagery and geospatial content, load layers from URLs or portal items, run raster analysis, perform 2D/3D measurements, and interact with your data through natural language. The demo reflects the latest build from this repository.
 
@@ -20,15 +18,14 @@ This app has been developed with the assistance of AI coding agents. Review the 
 
 ## What It Does
 
-- Sign in with ArcGIS and work with 2D maps or 3D scenes with a single toggle.
+- Sign in with ArcGIS and work with 2D maps or 3D scenes.
 - Search your ArcGIS Online organization for imagery, elevation, and other content.
-- Load layers by URL, item ID, or natural-language search — including Image Services, Feature Services, Scene Layers, and more.
-- Add elevation surfaces (tiled or dynamic Image Services) as ground terrain.
-- Perform measurements: distance, area, volume (cut/fill and stockpile), and elevation profiles.
-- Run raster analysis with server-side raster functions (NDVI, hillshade, slope, aspect, etc.).
+- Load layers by URL, item ID, or natural-language search.
+- Perform measurements: distance, area, volume, and elevation profiles.
+- Run raster analysis with server-side raster functions.
 - Compare layers side-by-side with a swipe tool.
-- Query layer metadata, field schemas, and service capabilities through natural language.
-- Adjust elevation offsets for 3D layers (e.g., oriented imagery, drone data).
+- Query layer metadata, fields, and service capabilities.
+- Adjust elevation offsets for 3D layers.
 
 ## Custom Agents
 
