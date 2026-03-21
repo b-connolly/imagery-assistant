@@ -14,7 +14,7 @@ Sign in with your ArcGIS Online account to explore the full capabilities — sea
 
 ## Disclaimer
 
-This app has been developed with the assistance of AI coding agents. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation.
+This app has been developed with the assistance of AI coding agents. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is just for testing new AI Agent capabilities in ArcGIS Maps SDK for JS. Some features are not fully complete and there are limitations to phrasing at this time.
 
 ## What It Does
 
