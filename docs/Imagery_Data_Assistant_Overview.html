@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Imagery Data Assistant — Overview &amp; Guide</title>
+<style>
+  @page {
+    size: letter;
+    margin: 0.75in 0.85in;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "Avenir Next", -apple-system, Helvetica, Arial, sans-serif;
+    color: #1a1a2e;
+    line-height: 1.6;
+    background: #fff;
+    font-size: 10.5pt;
+  }
+
+  /* ── Cover Page ───────────────────────────────── */
+  .cover {
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    text-align: center;
+    background: linear-gradient(160deg, #0d1117 0%, #131a28 40%, #0f2440 100%);
+    color: #e0e4e8;
+    padding: 2in 1in;
+  }
+  .cover-icon {
+    font-size: 72pt;
+    margin-bottom: 24px;
+  }
+  .cover h1 {
+    font-size: 32pt;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #5a9aff, #3c82f6, #7c5aff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .cover .subtitle {
+    font-size: 13pt;
+    color: #8b9cc0;
+    margin-bottom: 48px;
+  }
+  .cover .meta {
+    font-size: 9.5pt;
+    color: #5a6a82;
+    line-height: 1.8;
+  }
+  .cover .meta strong { color: #8b9cc0; }
+
+  /* ── Page sections ────────────────────────────── */
+  .page-break { page-break-before: always; }
+
+  h2 {
+    font-size: 17pt;
+    font-weight: 700;
+    color: #0f2440;
+    border-bottom: 3px solid #3c82f6;
+    padding-bottom: 6px;
+    margin: 32px 0 16px;
+  }
+  h2:first-of-type { margin-top: 0; }
+
+  h3 {
+    font-size: 12.5pt;
+    font-weight: 600;
+    color: #1e3a5f;
+    margin: 20px 0 8px;
+  }
+  h4 {
+    font-size: 11pt;
+    font-weight: 600;
+    color: #2a5a8a;
+    margin: 14px 0 6px;
+  }
+
+  p { margin: 6px 0; }
+
+  ul, ol { margin: 6px 0 6px 22px; }
+  li { margin: 3px 0; }
+
+  /* ── Info boxes ────────────────────────────────── */
+  .info-box {
+    background: #f0f4ff;
+    border-left: 4px solid #3c82f6;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 14px 0;
+  }
+  .info-box.green {
+    background: #f0faf0;
+    border-left-color: #2da44e;
+  }
+  .info-box.amber {
+    background: #fff8f0;
+    border-left-color: #d29922;
+  }
+
+  /* ── Agent cards ───────────────────────────────── */
+  .agent-card {
+    border: 1px solid #d0d7de;
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin: 14px 0;
+    background: #fafbfc;
+    page-break-inside: avoid;
+  }
+  .agent-card h3 {
+    margin-top: 0;
+    color: #0f2440;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .agent-card .badge {
+    display: inline-block;
+    font-size: 8pt;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: #fff;
+  }
+  .badge.builtin { background: #2da44e; }
+  .badge.custom  { background: #3c82f6; }
+
+  /* ── Prompt examples ──────────────────────────── */
+  .prompt {
+    font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+    font-size: 9.5pt;
+    background: #f0f4ff;
+    border: 1px solid #d0d7de;
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: #1e3a5f;
+    white-space: nowrap;
+  }
+
+  /* ── Workflow boxes ────────────────────────────── */
+  .workflow {
+    border: 1px solid #d0d7de;
+    border-radius: 8px;
+    margin: 16px 0;
+    overflow: hidden;
+    page-break-inside: avoid;
+  }
+  .workflow-title {
+    background: linear-gradient(135deg, #0f2440, #1e3a5f);
+    color: #e0e4e8;
+    padding: 10px 16px;
+    font-size: 11pt;
+    font-weight: 600;
+  }
+  .workflow-body {
+    padding: 14px 16px;
+    background: #fafbfc;
+  }
+  .workflow-body ol { margin-left: 18px; }
+  .workflow-body li { margin: 6px 0; }
+
+  /* ── Tech stack table ─────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 10pt;
+  }
+  th {
+    text-align: left;
+    background: #0f2440;
+    color: #e0e4e8;
+    padding: 8px 12px;
+    font-weight: 600;
+  }
+  td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #e1e4e8;
+  }
+  tr:nth-child(even) td { background: #f6f8fa; }
+
+  /* ── Architecture diagram (text-based) ─────────── */
+  .arch-diagram {
+    font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+    font-size: 8.5pt;
+    background: #0d1117;
+    color: #8b9cc0;
+    border-radius: 8px;
+    padding: 18px 20px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 14px 0;
+  }
+  .arch-diagram .highlight { color: #5a9aff; font-weight: 600; }
+  .arch-diagram .accent { color: #7c5aff; }
+  .arch-diagram .green { color: #3fb950; }
+  .arch-diagram .dim { color: #484f58; }
+
+  /* ── Footer ────────────────────────────────────── */
+  .footer {
+    margin-top: 40px;
+    padding-top: 12px;
+    border-top: 1px solid #d0d7de;
+    font-size: 8.5pt;
+    color: #8b9cc0;
+    text-align: center;
+  }
+
+  @media print {
+    body { font-size: 10pt; }
+    .cover { min-height: 100vh; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════ COVER PAGE -->
+<div class="cover">
+  <div class="cover-icon">&#x1F310;</div>
+  <h1>Imagery Data Assistant</h1>
+  <div class="subtitle">AI-Powered Geospatial Analysis &amp; Visualization</div>
+  <div class="meta">
+    <strong>Version</strong> 0.1.0<br>
+    <strong>Platform</strong> ArcGIS Maps SDK for JavaScript 5.0 + React<br>
+    <strong>Date</strong> March 2026
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ TABLE OF CONTENTS -->
+<h2>Table of Contents</h2>
+<ol style="font-size: 11pt; line-height: 2.2;">
+  <li><a href="#overview" style="color:#1e3a5f;">Overview</a></li>
+  <li><a href="#architecture" style="color:#1e3a5f;">Architecture</a></li>
+  <li><a href="#tech-stack" style="color:#1e3a5f;">Technology Stack</a></li>
+  <li><a href="#agents" style="color:#1e3a5f;">Agent Capabilities</a></li>
+  <li><a href="#workflows" style="color:#1e3a5f;">Example Workflows</a></li>
+  <li><a href="#getting-started" style="color:#1e3a5f;">Getting Started</a></li>
+</ol>
+
+<!-- ════════════════════════════════════════════════ OVERVIEW -->
+<h2 id="overview" class="page-break">1. Overview</h2>
+
+<p>
+The <strong>Imagery Data Assistant</strong> is a conversational AI-powered web application for
+geospatial data discovery, visualization, and analysis. Users interact with a natural-language
+chat interface to search for imagery and geospatial layers, load them onto a 2D or 3D map,
+apply raster analysis functions, take measurements, and adjust 3D elevation offsets &mdash; all
+without writing code or navigating complex menus.
+</p>
+
+<div class="info-box">
+  <strong>Key Idea:</strong> Instead of clicking through toolbars and dialogs, users simply
+  describe what they want in plain English. The assistant's AI orchestrator routes each request
+  to the appropriate specialized agent, which executes the task and reports results back in the chat.
+</div>
+
+<h3>Core Capabilities at a Glance</h3>
+<ul>
+  <li><strong>Content Search &amp; Discovery</strong> &mdash; Search My Content, My Org, ArcGIS Online, or Living Atlas for layers by keyword</li>
+  <li><strong>Layer Loading</strong> &mdash; Load any ArcGIS-supported layer type from a URL, item ID, or keyword search</li>
+  <li><strong>Imagery Analysis</strong> &mdash; Apply stretches, color ramps, NDVI, hillshade, slope, and server-side raster functions</li>
+  <li><strong>Measurement Tools</strong> &mdash; Distance, area, and elevation profile with configurable units</li>
+  <li><strong>3D Elevation Offset</strong> &mdash; Auto-fix or manually adjust floating/underground 3D layers</li>
+  <li><strong>Navigation &amp; Help</strong> &mdash; Zoom to locations, change basemaps, get contextual help</li>
+</ul>
+
+<!-- ════════════════════════════════════════════════ ARCHITECTURE -->
+<h2 id="architecture" class="page-break">2. Architecture</h2>
+
+<div class="arch-diagram"><span class="dim">┌─────────────────────────────────────────────────────────────────────┐</span>
+<span class="dim">│</span>  <span class="highlight">User Interface</span>                                                     <span class="dim">│</span>
+<span class="dim">│</span>                                                                     <span class="dim">│</span>
+<span class="dim">│</span>  ┌──────────────────────┐   ┌──────────────────────────────────────┐ <span class="dim">│</span>
+<span class="dim">│</span>  │  <span class="accent">arcgis-map / scene</span>  │   │  <span class="accent">arcgis-assistant</span> (Chat Panel)      │ <span class="dim">│</span>
+<span class="dim">│</span>  │  Map / Scene View     │   │                                      │ <span class="dim">│</span>
+<span class="dim">│</span>  │  + Widgets (zoom,     │   │  User types natural-language prompt  │ <span class="dim">│</span>
+<span class="dim">│</span>  │    legend, layers,    │   │           │                          │ <span class="dim">│</span>
+<span class="dim">│</span>  │    basemaps, measure) │   │           ▼                          │ <span class="dim">│</span>
+<span class="dim">│</span>  └──────────────────────┘   │  <span class="green">AI Orchestrator (LLM)</span>              │ <span class="dim">│</span>
+<span class="dim">│</span>                              │  Routes to best-matching agent       │ <span class="dim">│</span>
+<span class="dim">│</span>                              │           │                          │ <span class="dim">│</span>
+<span class="dim">│</span>                              │           ▼                          │ <span class="dim">│</span>
+<span class="dim">│</span>  <span class="highlight">Agents</span>                      │  ┌────────────────────────────────┐ │ <span class="dim">│</span>
+<span class="dim">│</span>  ┌──────────────────────┐   │  │ <span class="green">Content Search</span>  │ <span class="green">Load Layer</span>  │ │ <span class="dim">│</span>
+<span class="dim">│</span>  │ Built-in:            │   │  │ <span class="green">Imagery Analysis</span>│ <span class="green">Measurement</span> │ │ <span class="dim">│</span>
+<span class="dim">│</span>  │  • Help               │   │  │ <span class="green">Elev. Offset</span>   │ <span class="green">Capabilities</span>│ │ <span class="dim">│</span>
+<span class="dim">│</span>  │  • Navigation         │   │  │ <span class="green">Help Agent</span>     │ <span class="green">Navigation</span>  │ │ <span class="dim">│</span>
+<span class="dim">│</span>  │  • Data Exploration   │   │  │ <span class="green">Data Exploration</span>│             │ │ <span class="dim">│</span>
+<span class="dim">│</span>  └──────────────────────┘   │  └────────────────────────────────┘ │ <span class="dim">│</span>
+<span class="dim">│</span>                              └──────────────────────────────────────┘ <span class="dim">│</span>
+<span class="dim">│</span>                                                                     <span class="dim">│</span>
+<span class="dim">│</span>  <span class="highlight">Backend Services</span>                                                   <span class="dim">│</span>
+<span class="dim">│</span>  ┌──────────────────────────────────────────────────────────────────┐<span class="dim">│</span>
+<span class="dim">│</span>  │ ArcGIS Portal REST API  •  Image Server  •  Scene Server       │<span class="dim">│</span>
+<span class="dim">│</span>  │ OAuth 2.0  •  Portal Search  •  Raster Functions  •  Elevation  │<span class="dim">│</span>
+<span class="dim">│</span>  └──────────────────────────────────────────────────────────────────┘<span class="dim">│</span>
+<span class="dim">└─────────────────────────────────────────────────────────────────────┘</span></div>
+
+<h3>How It Works</h3>
+<ol>
+  <li>The user types a natural-language prompt in the <strong>arcgis-assistant</strong> chat panel.</li>
+  <li>The <strong>AI Orchestrator</strong> (powered by an LLM via LangChain/LangGraph) analyzes the prompt and routes it to the most relevant agent based on each agent's description.</li>
+  <li>The selected <strong>agent</strong> executes a LangGraph state graph: it extracts intent via fast regex patterns (falling back to LLM when needed), calls ArcGIS APIs, and returns a chat response.</li>
+  <li>Results are displayed in the chat &mdash; layers appear on the map, measurement tools activate, analysis renders, etc.</li>
+</ol>
+
+<div class="info-box green">
+  <strong>Smart Routing:</strong> Each agent includes bail-out logic that detects requests meant for
+  other agents and returns silently. This prevents conflicts when multiple agents receive the
+  same message from the orchestrator.
+</div>
+
+<!-- ════════════════════════════════════════════════ TECH STACK -->
+<h2 id="tech-stack" class="page-break">3. Technology Stack</h2>
+
+<table>
+  <tr><th style="width:35%">Component</th><th>Technology</th></tr>
+  <tr><td><strong>Mapping Engine</strong></td><td>ArcGIS Maps SDK for JavaScript 5.0 (<code>@arcgis/core</code> 5.0.3)</td></tr>
+  <tr><td><strong>Map Web Components</strong></td><td><code>@arcgis/map-components</code> 5.0.3 &mdash; <code>arcgis-map</code>, <code>arcgis-scene</code>, <code>arcgis-zoom</code>, <code>arcgis-home</code>, <code>arcgis-legend</code>, <code>arcgis-layer-list</code>, <code>arcgis-basemap-gallery</code>, measurement components</td></tr>
+  <tr><td><strong>AI Assistant Components</strong></td><td><code>@arcgis/ai-components</code> 5.0.3 &mdash; <code>arcgis-assistant</code>, <code>arcgis-assistant-agent</code>, built-in help/navigation/data-exploration agents</td></tr>
+  <tr><td><strong>UI Design System</strong></td><td>Calcite Design System (<code>@esri/calcite-components</code> 5.0.2) &mdash; shell, panels, buttons, icons, segmented controls, loaders</td></tr>
+  <tr><td><strong>AI Orchestration</strong></td><td>LangChain LangGraph (<code>@langchain/langgraph</code> 1.1.5) &mdash; StateGraph-based agent execution with node/edge workflows</td></tr>
+  <tr><td><strong>Frontend Framework</strong></td><td>React 18.3 with TypeScript 5.9</td></tr>
+  <tr><td><strong>Build Tool</strong></td><td>Vite 7.3 with React plugin</td></tr>
+  <tr><td><strong>Validation</strong></td><td>Zod 4.3 for runtime type checking</td></tr>
+  <tr><td><strong>Authentication</strong></td><td>ArcGIS OAuth 2.0 via IdentityManager</td></tr>
+</table>
+
+<h3>Key ArcGIS Web Components Used</h3>
+<table>
+  <tr><th>Component</th><th>Purpose</th></tr>
+  <tr><td><code>&lt;arcgis-map&gt;</code></td><td>2D MapView container</td></tr>
+  <tr><td><code>&lt;arcgis-scene&gt;</code></td><td>3D SceneView container</td></tr>
+  <tr><td><code>&lt;arcgis-assistant&gt;</code></td><td>AI chat panel with orchestrator</td></tr>
+  <tr><td><code>&lt;arcgis-assistant-agent&gt;</code></td><td>Custom agent registration element</td></tr>
+  <tr><td><code>&lt;arcgis-assistant-help-agent&gt;</code></td><td>Built-in help / FAQ agent</td></tr>
+  <tr><td><code>&lt;arcgis-assistant-navigation-agent&gt;</code></td><td>Built-in map navigation agent</td></tr>
+  <tr><td><code>&lt;arcgis-assistant-data-exploration-agent&gt;</code></td><td>Built-in data exploration agent</td></tr>
+  <tr><td><code>&lt;arcgis-distance-measurement-2d&gt;</code></td><td>2D distance measurement tool</td></tr>
+  <tr><td><code>&lt;arcgis-area-measurement-2d&gt;</code></td><td>2D area measurement tool</td></tr>
+  <tr><td><code>&lt;arcgis-direct-line-measurement-3d&gt;</code></td><td>3D line measurement tool</td></tr>
+  <tr><td><code>&lt;arcgis-area-measurement-3d&gt;</code></td><td>3D area measurement tool</td></tr>
+  <tr><td><code>&lt;arcgis-elevation-profile&gt;</code></td><td>Elevation cross-section tool</td></tr>
+  <tr><td><code>&lt;calcite-shell&gt;</code></td><td>Application layout shell</td></tr>
+</table>
+
+<!-- ════════════════════════════════════════════════ AGENTS -->
+<h2 id="agents" class="page-break">4. Agent Capabilities</h2>
+
+<p>The assistant includes <strong>9 agents</strong> &mdash; 3 built-in ArcGIS agents and 6 custom agents.
+The AI orchestrator selects the best agent for each user request based on the agent descriptions.</p>
+
+<!-- Built-in Agents -->
+<div class="agent-card">
+  <h3>Help Agent <span class="badge builtin">Built-in</span></h3>
+  <p>Answers general questions about the assistant, its capabilities, and how to use the application.
+  Provides contextual guidance based on the current map state.</p>
+</div>
+
+<div class="agent-card">
+  <h3>Navigation Agent <span class="badge builtin">Built-in</span></h3>
+  <p>Handles map navigation commands: zoom to locations, change basemaps, adjust view extent,
+  go to coordinates, and manage camera position in 3D.</p>
+</div>
+
+<div class="agent-card">
+  <h3>Data Exploration Agent <span class="badge builtin">Built-in</span></h3>
+  <p>Explores data attributes and statistics of layers loaded on the map. Supports filtering,
+  querying, and summarizing feature attributes.</p>
+</div>
+
+<!-- Custom Agents -->
+<div class="agent-card">
+  <h3>Content Search Agent <span class="badge custom">Custom</span></h3>
+  <p>Searches for geospatial layers across multiple ArcGIS sources and supports batch loading of results.</p>
+  <h4>Search Scopes</h4>
+  <ul>
+    <li><strong>My Content</strong> &mdash; user's own portal items</li>
+    <li><strong>My Organization</strong> &mdash; items shared within the org</li>
+    <li><strong>ArcGIS Online</strong> &mdash; public community content</li>
+    <li><strong>Living Atlas</strong> &mdash; Esri's curated authoritative datasets</li>
+    <li><strong>All</strong> &mdash; searches all scopes simultaneously</li>
+  </ul>
+  <h4>Batch Loading</h4>
+  <ul>
+    <li><span class="prompt">add result 3</span> &mdash; add a single result</li>
+    <li><span class="prompt">add results 1-5</span> &mdash; add a range</li>
+    <li><span class="prompt">add results 1, 3, 7</span> &mdash; add specific items</li>
+    <li><span class="prompt">add all results</span> &mdash; add everything from the search</li>
+  </ul>
+  <h4>Example Prompts</h4>
+  <ul>
+    <li><span class="prompt">search my content for Phoenix imagery</span></li>
+    <li><span class="prompt">find elevation data in Living Atlas</span></li>
+    <li><span class="prompt">from my org, find all layers related to wildfire</span></li>
+  </ul>
+</div>
+
+<div class="agent-card">
+  <h3>Load Layer Agent <span class="badge custom">Custom</span></h3>
+  <p>Loads any ArcGIS-supported layer type onto the map from a URL, portal item ID, or keyword search.</p>
+  <h4>Supported Layer Types</h4>
+  <p>Imagery, Feature, Tile, Map Image, Scene, Integrated Mesh, 3D Tiles, Gaussian Splat,
+  Point Cloud, Building Scene, Oriented Imagery, WMS, WFS, WMTS, KML, GeoJSON, CSV, Vector Tile</p>
+  <h4>Smart Features</h4>
+  <ul>
+    <li>Auto-detects layer type from URL pattern or portal item metadata</li>
+    <li>Automatically switches to 3D view when loading 3D-only layers</li>
+    <li>Supports elevation offset on load (e.g., <span class="prompt">load mesh with 50m offset</span>)</li>
+    <li>Auto-zooms to the loaded layer's extent</li>
+  </ul>
+  <h4>Example Prompts</h4>
+  <ul>
+    <li><span class="prompt">load world imagery</span></li>
+    <li><span class="prompt">load https://services.arcgis.com/.../ImageServer</span></li>
+    <li><span class="prompt">show me the layer with ID a1b2c3d4...</span></li>
+  </ul>
+</div>
+
+<div class="agent-card page-break">
+  <h3>Imagery Analysis Agent <span class="badge custom">Custom</span></h3>
+  <p>Analyzes and visualizes imagery layers already loaded on the map using renderers, raster functions,
+  and interactive tools.</p>
+  <h4>Capabilities</h4>
+  <table>
+    <tr><th>Category</th><th>Options</th></tr>
+    <tr><td>Stretch Renderers</td><td>Standard Deviation, Min-Max, Percent Clip</td></tr>
+    <tr><td>Color Ramps</td><td>Inferno, Viridis, Grayscale</td></tr>
+    <tr><td>Raster Functions</td><td>NDVI, Hillshade, Slope, Aspect, Color Infrared (False Color)</td></tr>
+    <tr><td>Server-side Functions</td><td>Automatically discovers and applies server processing templates</td></tr>
+    <tr><td>Interactive Tools</td><td>Click-to-identify pixel popup, center pixel identification</td></tr>
+    <tr><td>Export</td><td>Screenshot capture (PNG)</td></tr>
+  </table>
+  <h4>Example Prompts</h4>
+  <ul>
+    <li><span class="prompt">apply standard deviation stretch</span></li>
+    <li><span class="prompt">render with inferno color ramp</span></li>
+    <li><span class="prompt">apply NDVI</span></li>
+    <li><span class="prompt">show pixel values at center</span></li>
+    <li><span class="prompt">list available raster functions</span></li>
+    <li><span class="prompt">take a screenshot</span></li>
+  </ul>
+</div>
+
+<div class="agent-card">
+  <h3>Measurement Agent <span class="badge custom">Custom</span></h3>
+  <p>Activates interactive measurement tools on the map. Automatically selects the correct 2D or 3D
+  widget based on the current view.</p>
+  <h4>Measurement Types</h4>
+  <table>
+    <tr><th>Type</th><th>2D Component</th><th>3D Component</th></tr>
+    <tr><td>Distance</td><td><code>arcgis-distance-measurement-2d</code></td><td><code>arcgis-direct-line-measurement-3d</code></td></tr>
+    <tr><td>Area</td><td><code>arcgis-area-measurement-2d</code></td><td><code>arcgis-area-measurement-3d</code></td></tr>
+    <tr><td>Elevation Profile</td><td colspan="2"><code>arcgis-elevation-profile</code> (works in both)</td></tr>
+  </table>
+  <h4>Supported Units</h4>
+  <ul>
+    <li><strong>Linear:</strong> meters, kilometers, feet, miles, yards, nautical miles</li>
+    <li><strong>Area:</strong> square meters, square kilometers, square feet, square miles, acres, hectares</li>
+  </ul>
+  <h4>Example Prompts</h4>
+  <ul>
+    <li><span class="prompt">measure distance in kilometers</span></li>
+    <li><span class="prompt">measure area in acres</span></li>
+    <li><span class="prompt">show elevation profile</span></li>
+    <li><span class="prompt">clear measurement</span></li>
+  </ul>
+</div>
+
+<div class="agent-card">
+  <h3>Elevation Offset Agent <span class="badge custom">Custom</span></h3>
+  <p>Fixes 3D layers that appear floating above or sunken below the terrain by adjusting their
+  elevation offset. Supports automatic terrain-based correction and manual adjustments.</p>
+  <h4>Modes</h4>
+  <ul>
+    <li><strong>Auto-fix</strong> &mdash; Samples terrain elevation at a 5&times;5 grid across the layer extent,
+    calculates the optimal offset, and applies it automatically</li>
+    <li><strong>Manual Set</strong> &mdash; Sets an absolute offset value (e.g., <span class="prompt">set offset to 50 meters</span>)</li>
+    <li><strong>Relative Adjust</strong> &mdash; Adds or subtracts from current offset (e.g., <span class="prompt">raise by 10m</span>)</li>
+    <li><strong>Check</strong> &mdash; Reports current offset and Z-range without making changes</li>
+  </ul>
+  <h4>Supported 3D Layer Types</h4>
+  <p>Integrated Mesh, Scene Layer, Point Cloud, Building Scene Layer, Gaussian Splat, 3D Tiles</p>
+  <h4>Example Prompts</h4>
+  <ul>
+    <li><span class="prompt">fix the floating mesh</span></li>
+    <li><span class="prompt">align this layer to the ground</span></li>
+    <li><span class="prompt">add 16 meters to the layer</span></li>
+    <li><span class="prompt">lower the mesh by 20 feet</span></li>
+  </ul>
+</div>
+
+<div class="agent-card">
+  <h3>All Capabilities Agent <span class="badge custom">Custom</span></h3>
+  <p>Meta-agent that lists all available assistant capabilities. Dynamically discovers all registered
+  agents (both built-in and custom) and formats a human-readable summary. Triggered by prompts
+  like <span class="prompt">what can you do?</span> or <span class="prompt">list capabilities</span>.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════ WORKFLOWS -->
+<h2 id="workflows" class="page-break">5. Example Workflows</h2>
+
+<div class="workflow">
+  <div class="workflow-title">Workflow 1: Discover and Analyze Imagery</div>
+  <div class="workflow-body">
+    <p><strong>Scenario:</strong> A GIS analyst wants to find and analyze thermal imagery for a city.</p>
+    <ol>
+      <li><span class="prompt">search Living Atlas for thermal imagery in Phoenix</span>
+        <br><em>Content Search Agent returns a numbered list of matching imagery layers.</em></li>
+      <li><span class="prompt">add result 1</span>
+        <br><em>The layer is loaded onto the map and the view zooms to its extent.</em></li>
+      <li><span class="prompt">apply standard deviation stretch</span>
+        <br><em>Imagery Analysis Agent enhances the contrast for better visualization.</em></li>
+      <li><span class="prompt">render with inferno color ramp</span>
+        <br><em>A heat-style color ramp is applied to highlight temperature differences.</em></li>
+      <li><span class="prompt">enable click-to-identify popup</span>
+        <br><em>Clicking anywhere on the imagery now shows pixel/band values.</em></li>
+      <li><span class="prompt">take a screenshot</span>
+        <br><em>The current view is exported as a PNG image in a new browser tab.</em></li>
+    </ol>
+  </div>
+</div>
+
+<div class="workflow">
+  <div class="workflow-title">Workflow 2: Batch Load Organizational Content</div>
+  <div class="workflow-body">
+    <p><strong>Scenario:</strong> A project manager wants to load all team layers for a project area.</p>
+    <ol>
+      <li><span class="prompt">from my content, find all layers related to Phoenix</span>
+        <br><em>Content Search Agent searches the user's portal content and returns all matching items.</em></li>
+      <li><span class="prompt">add all results</span>
+        <br><em>All results are loaded concurrently onto the map. If any require 3D, the view
+        auto-switches to a Scene before loading.</em></li>
+      <li><span class="prompt">measure area in acres</span>
+        <br><em>The area measurement tool activates for the user to draw a polygon.</em></li>
+    </ol>
+  </div>
+</div>
+
+<div class="workflow">
+  <div class="workflow-title">Workflow 3: Load and Fix a 3D Mesh</div>
+  <div class="workflow-body">
+    <p><strong>Scenario:</strong> A drone survey produced a 3D mesh that floats above the terrain.</p>
+    <ol>
+      <li><span class="prompt">load https://tiles.arcgis.com/.../3DTilesServer/tileset.json</span>
+        <br><em>Load Layer Agent detects a 3D Tiles layer, auto-switches to 3D SceneView, and loads it.</em></li>
+      <li><span class="prompt">fix the floating mesh</span>
+        <br><em>Elevation Offset Agent samples terrain at 25 points across the layer extent,
+        calculates the ground-level offset, and applies the correction.</em></li>
+      <li><span class="prompt">raise by 2 meters</span>
+        <br><em>Fine-tunes the offset with a relative +2m adjustment.</em></li>
+      <li><span class="prompt">measure distance in feet</span>
+        <br><em>3D direct-line measurement tool activates in feet for verification.</em></li>
+      <li><span class="prompt">elevation profile</span>
+        <br><em>The elevation profile tool lets the user draw a line across the mesh to verify alignment.</em></li>
+    </ol>
+  </div>
+</div>
+
+<div class="workflow">
+  <div class="workflow-title">Workflow 4: Multi-Source Comparison</div>
+  <div class="workflow-body">
+    <p><strong>Scenario:</strong> Comparing elevation data from different sources.</p>
+    <ol>
+      <li><span class="prompt">search ArcGIS Online for NAIP imagery Arizona</span>
+        <br><em>Finds NAIP aerial imagery layers.</em></li>
+      <li><span class="prompt">add result 1</span>
+        <br><em>Loads the NAIP imagery as a base reference layer.</em></li>
+      <li><span class="prompt">apply NDVI</span>
+        <br><em>Applies Normalized Difference Vegetation Index to visualize vegetation health.</em></li>
+      <li><span class="prompt">find elevation data in Living Atlas</span>
+        <br><em>Searches for DEM / terrain layers in Esri's curated collection.</em></li>
+      <li><span class="prompt">add results 1-3</span>
+        <br><em>Loads the top three elevation datasets for comparison.</em></li>
+      <li><span class="prompt">apply hillshade to the elevation layer</span>
+        <br><em>Renders terrain shading for better visual interpretation.</em></li>
+    </ol>
+  </div>
+</div>
+
+<div class="workflow">
+  <div class="workflow-title">Workflow 5: Quick Q&amp;A and Exploration</div>
+  <div class="workflow-body">
+    <p><strong>Scenario:</strong> A new user learning the application.</p>
+    <ol>
+      <li><span class="prompt">what can you do?</span>
+        <br><em>All Capabilities Agent lists every available function with descriptions.</em></li>
+      <li><span class="prompt">zoom to San Francisco</span>
+        <br><em>Navigation Agent flies the map to San Francisco.</em></li>
+      <li><span class="prompt">load world imagery</span>
+        <br><em>Loads the Esri World Imagery basemap layer.</em></li>
+      <li><span class="prompt">how far is it from here to Oakland?</span>
+        <br><em>Measurement Agent activates the distance tool for the user to measure.</em></li>
+    </ol>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ GETTING STARTED -->
+<h2 id="getting-started" class="page-break">6. Getting Started</h2>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Node.js 18+ and npm</li>
+  <li>An ArcGIS Online or ArcGIS Enterprise account</li>
+  <li>An OAuth 2.0 Application ID registered in ArcGIS (for portal content access)</li>
+</ul>
+
+<h3>Setup</h3>
+<div class="info-box amber">
+  <strong>Environment Variables Required:</strong><br>
+  <code>VITE_ARCGIS_OAUTH_APP_ID</code> &mdash; Your ArcGIS OAuth application ID (required)<br>
+  <code>VITE_ARCGIS_PORTAL_URL</code> &mdash; Portal URL (optional, defaults to https://www.arcgis.com)<br>
+  <code>VITE_WEBMAP_ITEM_ID</code> &mdash; Existing web map ID (optional, auto-creates if not set)
+</div>
+
+<ol>
+  <li>Clone the repository and navigate to <code>Apps/imagery-assistant</code></li>
+  <li>Create a <code>.env</code> file with your OAuth App ID</li>
+  <li>Install dependencies: <code>npm install</code></li>
+  <li>Start the dev server: <code>npm run dev</code></li>
+  <li>Open the URL shown in your browser and sign in with your ArcGIS account</li>
+</ol>
+
+<h3>Build for Production</h3>
+<p>Run <code>npm run build</code> to produce an optimized production build in the <code>dist/</code> folder.</p>
+
+<!-- ── Footer ──────────────────────────────────── -->
+<div class="footer">
+  Imagery Data Assistant v0.1.0 &bull; Built with ArcGIS Maps SDK for JavaScript 5.0 &bull; March 2026
+</div>
+
+</body>
+</html>

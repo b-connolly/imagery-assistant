@@ -1,0 +1,471 @@
+/* ── Reset & Base ── */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background-color: #111118;
+  color: #e0e4e8;
+  font-family: "Avenir Next", "Segoe UI", -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+calcite-shell {
+  height: 100vh;
+  width: 100%;
+  --calcite-shell-border-color: transparent;
+  --calcite-shell-footer-height: 0px;
+}
+
+/* ── Header ── */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.25rem;
+  height: 48px;
+  background: linear-gradient(135deg, #0d1117 0%, #131a28 50%, #0f2440 100%);
+  border-bottom: 1px solid rgba(56, 130, 246, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.app-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.app-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e0e4e8;
+  letter-spacing: 0.03em;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #8b9cc0;
+  padding: 0.25rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Main layout ── */
+
+.main-content {
+  display: flex;
+  height: calc(100vh - 48px);
+  overflow: hidden;
+}
+
+.map-container {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+arcgis-map,
+arcgis-scene {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+arcgis-expand {
+  width: auto !important;
+  max-width: fit-content;
+}
+
+/* Swipe tool fills the full map area */
+arcgis-swipe {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── Measurement web component overrides ── */
+
+/*
+ * ArcGIS 5.0 web components: arcgis-distance-measurement-2d,
+ * arcgis-direct-line-measurement-3d, arcgis-area-measurement-2d,
+ * arcgis-area-measurement-3d, arcgis-elevation-profile.
+ *
+ * These render in Shadow DOM, so we style via the host element
+ * and Calcite/ArcGIS CSS custom properties.
+ */
+arcgis-distance-measurement-2d,
+arcgis-direct-line-measurement-3d,
+arcgis-area-measurement-2d,
+arcgis-area-measurement-3d,
+arcgis-elevation-profile,
+arcgis-volume-measurement {
+  --calcite-color-foreground-1: rgba(12, 14, 20, 0.96);
+  --calcite-color-foreground-2: rgba(20, 24, 32, 0.95);
+  --calcite-color-foreground-3: rgba(30, 36, 48, 0.95);
+  --calcite-color-text-1: #e0e4e8;
+  --calcite-color-text-2: #8a9ab5;
+  --calcite-color-text-3: #5a6a82;
+  --calcite-color-border-1: rgba(80, 140, 240, 0.2);
+  --calcite-color-border-2: rgba(255, 255, 255, 0.08);
+  --calcite-color-border-3: rgba(255, 255, 255, 0.04);
+  --calcite-color-brand: #3c82f6;
+  --calcite-color-brand-hover: #5a9aff;
+  --calcite-color-brand-press: #2a6cd6;
+  --calcite-font-family: "Avenir Next", "Segoe UI", -apple-system, sans-serif;
+  --calcite-border-radius: 10px;
+  --calcite-font-size-0: 0.8rem;
+  --calcite-font-size--1: 0.75rem;
+  border-radius: 12px;
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  overflow: hidden;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 12px 16px;
+}
+
+/* Elevation profile and volume measurement need more width */
+arcgis-elevation-profile,
+arcgis-volume-measurement {
+  min-width: 300px;
+  max-width: 420px;
+}
+
+/* ── Measurement wrapper with close button ── */
+
+.measurement-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 280px;
+  max-width: 360px;
+  border-radius: 12px;
+  background: rgba(12, 14, 20, 0.96);
+  border: 1px solid rgba(80, 140, 240, 0.2);
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  overflow: hidden;
+}
+
+/* Elevation profile and volume wrapper need more width */
+.measurement-wrapper:has(arcgis-elevation-profile),
+.measurement-wrapper:has(arcgis-volume-measurement) {
+  min-width: 360px;
+  max-width: 460px;
+}
+
+.measurement-wrapper arcgis-distance-measurement-2d,
+.measurement-wrapper arcgis-direct-line-measurement-3d,
+.measurement-wrapper arcgis-area-measurement-2d,
+.measurement-wrapper arcgis-area-measurement-3d,
+.measurement-wrapper arcgis-elevation-profile,
+.measurement-wrapper arcgis-volume-measurement {
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  padding: 16px 20px;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  --calcite-color-foreground-1: rgba(12, 14, 20, 0.96);
+  --calcite-color-foreground-2: rgba(20, 24, 32, 0.95);
+  --calcite-color-foreground-3: rgba(30, 36, 48, 0.95);
+}
+
+.measurement-header {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.measurement-close-btn {
+  --calcite-action-background-color: rgba(12, 14, 20, 0.7);
+  --calcite-action-background-color-hover: rgba(255, 255, 255, 0.12);
+  --calcite-action-background-color-press: rgba(255, 255, 255, 0.16);
+  --calcite-color-text-1: #e0e4e8;
+  --calcite-action-indicator-color: transparent;
+  border-radius: 6px;
+}
+
+/* ── Assistant panel ── */
+
+#assistant-panel {
+  width: 420px;
+  min-width: 380px;
+  max-width: 520px;
+  border-left: 1px solid rgba(56, 130, 246, 0.1);
+  display: flex;
+  flex-direction: column;
+  background: #111118;
+  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.3);
+}
+
+arcgis-assistant {
+  display: block;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Sign-in panel ── */
+
+.sign-in-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2.5rem;
+  text-align: center;
+  gap: 1.5rem;
+}
+
+.sign-in-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 2.5rem 2rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  max-width: 320px;
+  width: 100%;
+}
+
+.sign-in-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(56, 130, 246, 0.15), rgba(56, 130, 246, 0.05));
+  border: 1px solid rgba(56, 130, 246, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.sign-in-text {
+  color: #6b7a94;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Loading overlay ── */
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #111118;
+  z-index: 100;
+  gap: 1.25rem;
+}
+
+.loading-overlay .loading-text {
+  color: #6b7a94;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+
+/* ── No OAuth warning ── */
+
+.no-oauth-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  gap: 1rem;
+}
+
+.no-oauth-warning h2 {
+  color: #e0e4e8;
+  margin: 0;
+  font-weight: 600;
+}
+
+.no-oauth-warning p {
+  color: #6b7a94;
+  max-width: 480px;
+  line-height: 1.7;
+}
+
+.no-oauth-warning code {
+  background: rgba(56, 130, 246, 0.1);
+  padding: 0.2em 0.5em;
+  border-radius: 5px;
+  font-size: 0.83rem;
+  color: #58b4f6;
+  border: 1px solid rgba(56, 130, 246, 0.15);
+}
+
+/* ── Map UI widget overrides (zoom, home, compass, expand) ── */
+
+/* Shift the entire top-left widget group 12px right */
+.esri-ui-top-left {
+  left: 12px !important;
+}
+
+/* All widget buttons — uniform size */
+.esri-ui-corner .esri-component.esri-widget--button,
+.esri-zoom .esri-widget--button,
+.esri-home .esri-widget--button {
+  background: rgba(15, 17, 23, 0.9) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 14px !important;
+}
+
+.esri-ui-corner .esri-component.esri-widget--button:hover,
+.esri-zoom .esri-widget--button:hover,
+.esri-home .esri-widget--button:hover {
+  background: rgba(25, 30, 40, 0.95) !important;
+}
+
+/* Compass web component — constrain to match other widgets */
+arcgis-compass {
+  width: 32px !important;
+  height: 32px !important;
+  max-width: 32px !important;
+  display: block;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+arcgis-compass * {
+  max-width: 32px !important;
+  max-height: 32px !important;
+}
+
+arcgis-compass .arcgis-button,
+arcgis-compass .arcgis-button calcite-button {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  border-radius: 2px !important;
+  background: rgba(15, 17, 23, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 4px spacing between each widget */
+.esri-ui-top-left .esri-component {
+  margin-bottom: 4px !important;
+}
+
+arcgis-zoom,
+arcgis-home,
+arcgis-compass {
+  margin-bottom: 4px !important;
+}
+
+/* Expand toggle buttons match the same size */
+.esri-expand__toggle {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+/* Zoom widget buttons stack with no gap */
+.esri-zoom {
+  gap: 0 !important;
+}
+
+/* ── Popup overrides ── */
+
+.esri-popup__main-container {
+  background: rgba(15, 17, 23, 0.92) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(56, 130, 246, 0.15) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 900px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  #assistant-panel {
+    width: 100%;
+    min-width: unset;
+    max-width: unset;
+    height: 40%;
+    border-left: none;
+    border-top: 1px solid rgba(56, 130, 246, 0.1);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* ── Error Boundary ── */
+
+.error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background: #111118;
+  color: #e0e4e8;
+}
+
+.error-boundary-card {
+  text-align: center;
+  max-width: 420px;
+  padding: 40px;
+  background: rgba(20, 24, 32, 0.95);
+  border: 1px solid rgba(255, 60, 60, 0.25);
+  border-radius: 12px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+}
+
+.error-boundary-card h2 {
+  margin: 16px 0 8px;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.error-boundary-message {
+  color: #8b9cc0;
+  font-size: 0.9rem;
+  margin-bottom: 24px;
+  word-break: break-word;
+}
+
+.error-boundary-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
