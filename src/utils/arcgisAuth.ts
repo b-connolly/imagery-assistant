@@ -54,14 +54,24 @@ export async function getPortalUser(): Promise<{
   fullName: string;
   username: string;
   thumbnailUrl: string | null;
+  orgUrl: string;
 }> {
   const portal = new Portal({ url: portalUrl });
   await portal.load();
   const user = portal.user!;
+  // Build org-specific URL: https://{urlKey}.{customBaseUrl}
+  // e.g., urlKey="ivt" + customBaseUrl="maps.arcgis.com" → https://ivt.maps.arcgis.com
+  const urlKey = (portal as any).urlKey;
+  const customBase = (portal as any).customBaseUrl;
+  const orgUrl = urlKey && customBase
+    ? `https://${urlKey}.${customBase}`
+    : portal.url ?? portalUrl;
+  console.log("[Auth] Org URL:", orgUrl, "urlKey:", urlKey, "customBase:", customBase);
   return {
     fullName: user.fullName ?? "",
     username: user.username ?? "",
     thumbnailUrl: user.thumbnailUrl ?? null,
+    orgUrl,
   };
 }
 

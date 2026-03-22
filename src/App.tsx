@@ -72,11 +72,10 @@ export default function App() {
     setSignedIn(true);
     const user = await getPortalUser();
     setUserName(user.fullName);
-    const portalUrl = import.meta.env.VITE_ARCGIS_PORTAL_URL || "https://www.arcgis.com";
     setUserInfo({
       username: user.username,
       thumbnailUrl: user.thumbnailUrl,
-      orgUrl: portalUrl,
+      orgUrl: user.orgUrl,
     });
     const itemId = await ensureWebMapItem();
     assistantItemId.current = itemId;
@@ -513,13 +512,13 @@ export default function App() {
         <div className="app-header-right">
           <ViewToggle currentView={viewType} onToggle={handleViewToggle} />
           {signedIn ? (
-            <calcite-dropdown placement="bottom-end" scale="s">
+            <>
               <calcite-button
-                slot="trigger"
+                id="user-menu-trigger"
                 appearance="transparent"
                 scale="s"
                 icon-end="chevron-down"
-                style={{ color: "#e0e4e8", gap: "8px" }}
+                style={{ color: "#e0e4e8" }}
               >
                 {userInfo.thumbnailUrl ? (
                   <img
@@ -532,44 +531,29 @@ export default function App() {
                 )}
                 {userName}
               </calcite-button>
-              <calcite-dropdown-group>
-                <calcite-dropdown-item
-                  icon-start="user"
-                  href={`${userInfo.orgUrl}/home/user.html`}
-                  target="_blank"
-                >
-                  My Profile
-                </calcite-dropdown-item>
-                <calcite-dropdown-item
-                  icon-start="organization"
-                  href={`${userInfo.orgUrl}/home/`}
-                  target="_blank"
-                >
-                  My Organization
-                </calcite-dropdown-item>
-                <calcite-dropdown-item
-                  icon-start="content-full"
-                  href={`${userInfo.orgUrl}/home/content.html`}
-                  target="_blank"
-                >
-                  My Content
-                </calcite-dropdown-item>
-              </calcite-dropdown-group>
-              <calcite-dropdown-group>
-                <calcite-dropdown-item
-                  icon-start="switch"
-                  onClick={signOut}
-                >
-                  Switch Account
-                </calcite-dropdown-item>
-                <calcite-dropdown-item
-                  icon-start="sign-out"
-                  onClick={signOut}
-                >
-                  Sign Out
-                </calcite-dropdown-item>
-              </calcite-dropdown-group>
-            </calcite-dropdown>
+              <calcite-popover
+                reference-element="user-menu-trigger"
+                placement="bottom-end"
+                auto-close={true}
+                style={{ "--calcite-popover-border-color": "#404040" } as any}
+              >
+                <div style={{ padding: "8px 0", minWidth: 200, background: "#1e1e1e" }}>
+                  <a href={`${userInfo.orgUrl}/home/user.html`} target="_blank" rel="noreferrer" className="user-menu-item">
+                    <calcite-icon icon="user" scale="s" /> My Profile
+                  </a>
+                  <a href={`${userInfo.orgUrl}/home/`} target="_blank" rel="noreferrer" className="user-menu-item">
+                    <calcite-icon icon="organization" scale="s" /> My Organization
+                  </a>
+                  <a href={`${userInfo.orgUrl}/home/content.html`} target="_blank" rel="noreferrer" className="user-menu-item">
+                    <calcite-icon icon="content-full" scale="s" /> My Content
+                  </a>
+                  <div style={{ borderTop: "1px solid #404040", margin: "6px 0" }} />
+                  <button className="user-menu-item" onClick={signOut}>
+                    <calcite-icon icon="sign-out" scale="s" /> Sign Out
+                  </button>
+                </div>
+              </calcite-popover>
+            </>
           ) : (
             <calcite-button
               appearance="outline-fill"
