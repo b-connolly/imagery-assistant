@@ -535,19 +535,22 @@ export default function App() {
               <calcite-dropdown-group>
                 <calcite-dropdown-item
                   icon-start="user"
-                  onClick={() => window.open(`${userInfo.orgUrl}/home/user.html`, "_blank")}
+                  href={`${userInfo.orgUrl}/home/user.html`}
+                  target="_blank"
                 >
                   My Profile
                 </calcite-dropdown-item>
                 <calcite-dropdown-item
                   icon-start="organization"
-                  onClick={() => window.open(`${userInfo.orgUrl}/home/`, "_blank")}
+                  href={`${userInfo.orgUrl}/home/`}
+                  target="_blank"
                 >
                   My Organization
                 </calcite-dropdown-item>
                 <calcite-dropdown-item
                   icon-start="content-full"
-                  onClick={() => window.open(`${userInfo.orgUrl}/home/content.html`, "_blank")}
+                  href={`${userInfo.orgUrl}/home/content.html`}
+                  target="_blank"
                 >
                   My Content
                 </calcite-dropdown-item>
@@ -555,7 +558,7 @@ export default function App() {
               <calcite-dropdown-group>
                 <calcite-dropdown-item
                   icon-start="switch"
-                  onClick={() => { signOut(); }}
+                  onClick={signOut}
                 >
                   Switch Account
                 </calcite-dropdown-item>
