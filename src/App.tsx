@@ -6,6 +6,7 @@ import {
   getCredential,
   getPortalUser,
   ensureWebMapItem,
+  signOut,
 } from "./utils/arcgisAuth";
 import ElevationLayer from "@arcgis/core/layers/ElevationLayer";
 import {
@@ -57,6 +58,7 @@ export default function App() {
   const [viewType, setViewType] = useState<ViewType>("2d");
   const [webMapId, setWebMapId] = useState<string | null>(null);
   const [webSceneId, setWebSceneId] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   // The web map item ID used by the assistant for embeddings storage (not for the map view)
   const assistantItemId = useRef<string | null>(null);
@@ -450,6 +452,18 @@ export default function App() {
       if (assistantRegistered.current) return;
       assistantRegistered.current = true;
       registerCustomAgents(el);
+
+      // Listen for AI model errors (403 = org doesn't have AI Models license)
+      el.addEventListener("arcgisError", ((evt: CustomEvent) => {
+        const msg = evt.detail?.message ?? evt.detail?.error?.message ?? String(evt.detail);
+        console.error("[App] Assistant error:", msg);
+        if (/403|forbidden/i.test(msg)) {
+          setAiError(
+            "Your ArcGIS Online organization does not have access to ArcGIS AI Models. " +
+            "Ask your org admin to enable AI Models under Organization Settings > Security."
+          );
+        }
+      }) as EventListener);
     },
     []
   );
@@ -492,7 +506,16 @@ export default function App() {
         <div className="app-header-right">
           <ViewToggle currentView={viewType} onToggle={handleViewToggle} />
           {signedIn ? (
-            <span className="user-name">{userName}</span>
+            <calcite-button
+              appearance="transparent"
+              scale="s"
+              icon-end="sign-out"
+              onClick={signOut}
+              title="Sign out"
+              style={{ color: "#8b9cc0" }}
+            >
+              {userName}
+            </calcite-button>
           ) : (
             <calcite-button
               appearance="outline-fill"
@@ -539,6 +562,21 @@ export default function App() {
         </div>
 
         <div id="assistant-panel">
+          {aiError && (
+            <div style={{
+              padding: "12px 16px",
+              background: "rgba(255, 80, 60, 0.12)",
+              border: "1px solid rgba(255, 80, 60, 0.3)",
+              borderRadius: "8px",
+              margin: "12px",
+              color: "#ff9080",
+              fontSize: "0.82rem",
+              lineHeight: 1.5,
+            }}>
+              <strong>AI Models Unavailable</strong>
+              <p style={{ margin: "6px 0 0" }}>{aiError}</p>
+            </div>
+          )}
           {signedIn ? (
             <arcgis-assistant
               ref={assistantRefCallback}

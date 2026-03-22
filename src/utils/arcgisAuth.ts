@@ -65,6 +65,14 @@ export async function getPortalUser(): Promise<{
   };
 }
 
+/**
+ * Sign out: destroy all credentials and reload the page.
+ */
+export function signOut(): void {
+  IdentityManager.destroyCredentials();
+  window.location.reload();
+}
+
 const EMBEDDINGS_RESOURCE = "embeddings-v01.json";
 
 /**
