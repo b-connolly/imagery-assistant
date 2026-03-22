@@ -54,6 +54,7 @@ export default function App() {
   const [oauthReady, setOauthReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [userName, setUserName] = useState("");
+  const [userInfo, setUserInfo] = useState<{ username: string; thumbnailUrl: string | null; orgUrl: string }>({ username: "", thumbnailUrl: null, orgUrl: "" });
   const [loading, setLoading] = useState(true);
   const [viewType, setViewType] = useState<ViewType>("2d");
   const [webMapId, setWebMapId] = useState<string | null>(null);
@@ -71,6 +72,12 @@ export default function App() {
     setSignedIn(true);
     const user = await getPortalUser();
     setUserName(user.fullName);
+    const portalUrl = import.meta.env.VITE_ARCGIS_PORTAL_URL || "https://www.arcgis.com";
+    setUserInfo({
+      username: user.username,
+      thumbnailUrl: user.thumbnailUrl,
+      orgUrl: portalUrl,
+    });
     const itemId = await ensureWebMapItem();
     assistantItemId.current = itemId;
     setWebMapId(itemId);
@@ -506,16 +513,60 @@ export default function App() {
         <div className="app-header-right">
           <ViewToggle currentView={viewType} onToggle={handleViewToggle} />
           {signedIn ? (
-            <calcite-button
-              appearance="transparent"
-              scale="s"
-              icon-end="sign-out"
-              onClick={signOut}
-              title="Sign out"
-              style={{ color: "#8b9cc0" }}
-            >
-              {userName}
-            </calcite-button>
+            <calcite-dropdown placement="bottom-end" scale="s">
+              <calcite-button
+                slot="trigger"
+                appearance="transparent"
+                scale="s"
+                icon-end="chevron-down"
+                style={{ color: "#e0e4e8", gap: "8px" }}
+              >
+                {userInfo.thumbnailUrl ? (
+                  <img
+                    src={userInfo.thumbnailUrl}
+                    alt=""
+                    style={{ width: 24, height: 24, borderRadius: "50%", marginRight: 6, verticalAlign: "middle" }}
+                  />
+                ) : (
+                  <calcite-icon icon="user" scale="s" style={{ marginRight: 4 }} />
+                )}
+                {userName}
+              </calcite-button>
+              <calcite-dropdown-group>
+                <calcite-dropdown-item
+                  icon-start="user"
+                  onClick={() => window.open(`${userInfo.orgUrl}/home/user.html`, "_blank")}
+                >
+                  My Profile
+                </calcite-dropdown-item>
+                <calcite-dropdown-item
+                  icon-start="organization"
+                  onClick={() => window.open(`${userInfo.orgUrl}/home/`, "_blank")}
+                >
+                  My Organization
+                </calcite-dropdown-item>
+                <calcite-dropdown-item
+                  icon-start="content-full"
+                  onClick={() => window.open(`${userInfo.orgUrl}/home/content.html`, "_blank")}
+                >
+                  My Content
+                </calcite-dropdown-item>
+              </calcite-dropdown-group>
+              <calcite-dropdown-group>
+                <calcite-dropdown-item
+                  icon-start="switch"
+                  onClick={() => { signOut(); }}
+                >
+                  Switch Account
+                </calcite-dropdown-item>
+                <calcite-dropdown-item
+                  icon-start="sign-out"
+                  onClick={signOut}
+                >
+                  Sign Out
+                </calcite-dropdown-item>
+              </calcite-dropdown-group>
+            </calcite-dropdown>
           ) : (
             <calcite-button
               appearance="outline-fill"

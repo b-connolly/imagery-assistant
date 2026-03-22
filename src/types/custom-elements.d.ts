@@ -9,6 +9,10 @@ declare namespace JSX {
     "calcite-loader": any;
     "calcite-segmented-control": any;
     "calcite-segmented-control-item": any;
+    "calcite-dropdown": any;
+    "calcite-dropdown-group": any;
+    "calcite-dropdown-item": any;
+    "calcite-action": any;
     // ArcGIS Map components
     "arcgis-map": any;
     "arcgis-scene": any;
