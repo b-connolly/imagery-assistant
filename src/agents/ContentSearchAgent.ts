@@ -253,24 +253,25 @@ async function addMultipleResultsToMap(
       await withTimeout(layer.load(), 30000, `Load "${target.title}"`);
 
       // Zoom to the layer extent.
+      // Prefer fullExtent (instant) over queryExtent (can be very slow on large services).
+      // Only use queryExtent for layers without fullExtent (e.g., OrientedImageryLayer).
       try {
-        let zoomTarget: any = null;
-        // For queryable layers (Feature, OI sublayer, etc.), queryExtent gives the true data extent
-        const queryableLayer = typeof layer.queryExtent === "function"
-          ? layer
-          // Group layers (OrientedImageryLayer): find a queryable sublayer
-          : layer.layers?.toArray?.()?.find((sl: any) => typeof sl.queryExtent === "function") ?? null;
-        if (queryableLayer) {
-          try {
-            if (queryableLayer.loadStatus !== "loaded" && typeof queryableLayer.load === "function") {
-              await queryableLayer.load();
-            }
-            const result = await queryableLayer.queryExtent();
-            zoomTarget = result?.extent;
-          } catch { /* fall through */ }
+        let zoomTarget: any = layer.fullExtent;
+        if (!zoomTarget) {
+          // Try queryExtent with a 5s timeout — for layers like OI that don't populate fullExtent
+          const queryableLayer = typeof layer.queryExtent === "function"
+            ? layer
+            : layer.layers?.toArray?.()?.find((sl: any) => typeof sl.queryExtent === "function") ?? null;
+          if (queryableLayer) {
+            try {
+              if (queryableLayer.loadStatus !== "loaded" && typeof queryableLayer.load === "function") {
+                await queryableLayer.load();
+              }
+              const result = await withTimeout(queryableLayer.queryExtent(), 5000, "queryExtent");
+              zoomTarget = result?.extent;
+            } catch { /* fall through — timeout or error */ }
+          }
         }
-        // Fall back to fullExtent or layerView extent
-        if (!zoomTarget) zoomTarget = layer.fullExtent;
         if (!zoomTarget) {
           try {
             const lv = await view.whenLayerView(layer);

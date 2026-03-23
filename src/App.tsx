@@ -20,7 +20,7 @@ import {
 } from "./utils/viewManager";
 import ViewToggle from "./components/ViewToggle";
 import { registerLoadLayerAgent } from "./agents/LoadLayerAgent";
-import { registerImageryAnalysisAgent } from "./agents/ImageryAnalysisAgent";
+import { registerImageryToolsAgent } from "./agents/ImageryToolsAgent";
 import { registerElevationOffsetAgent } from "./agents/ElevationOffsetAgent";
 import { registerContentSearchAgent } from "./agents/ContentSearchAgent";
 import { registerMeasurementAgent } from "./agents/MeasurementAgent";
@@ -41,7 +41,7 @@ const DEFAULT_ZOOM = 1;
  */
 function registerCustomAgents(assistant: HTMLElement) {
   registerLoadLayerAgent(assistant);
-  registerImageryAnalysisAgent(assistant);
+  registerImageryToolsAgent(assistant);
   registerElevationOffsetAgent(assistant);
   registerContentSearchAgent(assistant);
   registerMeasurementAgent(assistant);

@@ -4,6 +4,7 @@ import RasterStretchRenderer from "@arcgis/core/renderers/RasterStretchRenderer"
 import MultipartColorRamp from "@arcgis/core/rest/support/MultipartColorRamp";
 import AlgorithmicColorRamp from "@arcgis/core/rest/support/AlgorithmicColorRamp";
 import Color from "@arcgis/core/Color";
+import * as rasterFunctionUtils from "@arcgis/core/layers/support/rasterFunctionUtils";
 import { safeFetch, appendToken } from "./safeFetch";
 
 // ── Stretch types ────────────────────────────────────────────────────────────
@@ -12,20 +13,44 @@ export type StretchType =
   | "none"
   | "standard-deviation"
   | "min-max"
-  | "percent-clip";
+  | "percent-clip"
+  | "histogram-equalization"
+  | "sigmoid";
+
+export interface StretchOptions {
+  stdDevs?: number;
+  minPercent?: number;
+  maxPercent?: number;
+  sigmoidStrength?: number;
+  dynamicRangeAdjustment?: boolean;
+  gamma?: number[];
+  colorRampName?: string;
+}
 
 export function applyStretch(
   layer: ImageryLayer,
   stretchType: StretchType,
-  stdDevs: number = 2,
-  includeColorRamp: boolean = false
+  options: StretchOptions = {}
 ): void {
   const opts: any = {
-    stretchType: stretchType,
-    numberOfStandardDeviations: stdDevs,
+    stretchType,
+    numberOfStandardDeviations: options.stdDevs ?? 2,
+    dynamicRangeAdjustment: options.dynamicRangeAdjustment ?? false,
   };
-  if (includeColorRamp) {
-    opts.colorRamp = createInfernoRamp();
+
+  if (stretchType === "percent-clip") {
+    opts.minPercent = options.minPercent ?? 0.25;
+    opts.maxPercent = options.maxPercent ?? 0.25;
+  }
+  if (stretchType === "sigmoid") {
+    opts.sigmoidStrengthLevel = options.sigmoidStrength ?? 3;
+  }
+  if (options.gamma) {
+    opts.gamma = options.gamma;
+    opts.useGamma = true;
+  }
+  if (options.colorRampName) {
+    opts.colorRamp = getColorRampByName(options.colorRampName);
   }
 
   layer.renderer = new RasterStretchRenderer(opts);
@@ -34,149 +59,266 @@ export function applyStretch(
 
 // ── Color ramps ──────────────────────────────────────────────────────────────
 
+// Custom ramp color stops for backward compatibility
 const INFERNO_STOPS = [
-  [0, 0, 4],
-  [31, 12, 72],
-  [85, 15, 109],
-  [136, 34, 106],
-  [186, 54, 85],
-  [227, 89, 51],
-  [249, 140, 10],
-  [249, 201, 50],
-  [252, 255, 164],
-  [255, 255, 234],
+  [0, 0, 4], [31, 12, 72], [85, 15, 109], [136, 34, 106],
+  [186, 54, 85], [227, 89, 51], [249, 140, 10], [249, 201, 50],
+  [252, 255, 164], [255, 255, 234],
 ];
 
 const VIRIDIS_STOPS = [
-  [68, 1, 84],
-  [72, 36, 117],
-  [65, 68, 135],
-  [53, 95, 141],
-  [42, 120, 142],
-  [33, 145, 140],
-  [34, 168, 132],
-  [68, 191, 112],
-  [122, 209, 81],
-  [189, 223, 38],
-  [253, 231, 37],
+  [68, 1, 84], [72, 36, 117], [65, 68, 135], [53, 95, 141],
+  [42, 120, 142], [33, 145, 140], [34, 168, 132], [68, 191, 112],
+  [122, 209, 81], [189, 223, 38], [253, 231, 37],
 ];
-
-const GRAYSCALE_STOPS = [
-  [0, 0, 0],
-  [255, 255, 255],
-];
-
-export type ColorRampName = "inferno" | "viridis" | "grayscale";
 
 function stopsToRamp(stops: number[][]): MultipartColorRamp {
   const ramps: AlgorithmicColorRamp[] = [];
   for (let i = 0; i < stops.length - 1; i++) {
-    ramps.push(
-      new AlgorithmicColorRamp({
-        fromColor: new Color(stops[i]),
-        toColor: new Color(stops[i + 1]),
-        algorithm: "lab-lch",
-      })
-    );
+    ramps.push(new AlgorithmicColorRamp({
+      fromColor: new Color(stops[i]),
+      toColor: new Color(stops[i + 1]),
+      algorithm: "lab-lch",
+    }));
   }
   return new MultipartColorRamp({ colorRamps: ramps });
 }
 
-export function createInfernoRamp(): MultipartColorRamp {
-  return stopsToRamp(INFERNO_STOPS);
-}
-
-export function createViridisRamp(): MultipartColorRamp {
-  return stopsToRamp(VIRIDIS_STOPS);
-}
-
-export function createGrayscaleRamp(): MultipartColorRamp {
-  return stopsToRamp(GRAYSCALE_STOPS);
-}
-
-export function getColorRamp(name: ColorRampName): MultipartColorRamp {
-  switch (name) {
-    case "inferno":
-      return createInfernoRamp();
-    case "viridis":
-      return createViridisRamp();
-    case "grayscale":
-      return createGrayscaleRamp();
+/**
+ * Get a color ramp by name. Supports custom names (inferno, viridis)
+ * and SDK ramp names via colormapByRampName.
+ */
+export function getColorRampByName(name: string): MultipartColorRamp | null {
+  switch (name.toLowerCase()) {
+    case "inferno": return stopsToRamp(INFERNO_STOPS);
+    case "viridis": return stopsToRamp(VIRIDIS_STOPS);
+    case "grayscale": return stopsToRamp([[0, 0, 0], [255, 255, 255]]);
+    default: return null; // SDK ramp names handled via renderer colorRamp property
   }
 }
+
+/** All SDK-supported color ramp names. */
+export const SDK_COLOR_RAMPS = [
+  "aspect", "black-to-white", "blue-bright", "blue-light-to-dark",
+  "blue-green-bright", "brown-light-to-dark", "cold-to-hot-diverging",
+  "cyan-to-purple", "elevation1", "elevation2", "errors",
+  "gray-light-to-dark", "green-bright", "green-light-to-dark",
+  "green-to-blue", "orange-bright", "orange-light-to-dark",
+  "partial-spectrum", "precipitation", "prediction", "purple-bright",
+  "purple-to-green-diverging", "red-bright", "red-light-to-dark",
+  "red-to-blue-diverging", "red-to-green", "slope",
+  "spectrum-full-bright", "surface", "temperature",
+  "white-to-black", "yellow-to-dark-red", "yellow-to-red",
+  "yellow-green-bright", "inferno", "viridis", "grayscale",
+];
 
 export function applyColorRamp(
   layer: ImageryLayer,
-  rampName: ColorRampName,
+  rampName: string,
   stretchType: StretchType = "standard-deviation",
   stdDevs: number = 2
 ): void {
-  const renderer = new RasterStretchRenderer({
-    stretchType: stretchType as any,
-    numberOfStandardDeviations: stdDevs,
-    colorRamp: getColorRamp(rampName),
-  });
-  layer.renderer = renderer;
-  layer.refresh();
+  applyStretch(layer, stretchType, { stdDevs, colorRampName: rampName });
 }
 
-// ── Raster functions (server-side processing templates) ──────────────────────
+// ── Server-side processing templates ─────────────────────────────────────────
 
-export type RasterFunctionName =
-  | "NDVI"
-  | "Hillshade"
-  | "Slope"
-  | "Aspect"
-  | "ColorIR"
-  | "None";
-
-export function applyRasterFunction(
-  layer: ImageryLayer,
-  functionName: RasterFunctionName
-): void {
-  if (functionName === "None") {
-    layer.rasterFunction = null as any;
-    layer.refresh();
-    return;
-  }
-
-  if (functionName === "ColorIR") {
-    layer.rasterFunction = new RasterFunction({
-      functionName: "CompositeBand",
-      functionArguments: {
-        Bands: [4, 1, 2], // NIR, Red, Green
-      },
-    });
-    layer.refresh();
-    return;
-  }
-
-  // Standard named server-side functions
-  layer.rasterFunction = new RasterFunction({
-    functionName,
-  });
-  layer.refresh();
+export interface ServerTemplate {
+  name: string;
+  description: string;
+  help?: string;
 }
 
 /**
- * Get available raster function names from an ImageryLayer's service metadata.
+ * Get available server-side processing templates from the imagery layer.
  */
-export function getAvailableRasterFunctions(
-  layer: ImageryLayer
-): string[] {
+export function getServerTemplates(layer: ImageryLayer): ServerTemplate[] {
   const infos = (layer as any).rasterFunctionInfos;
   if (!Array.isArray(infos)) return [];
-  return infos.map((info: any) => info.name as string);
+  return infos.map((info: any) => ({
+    name: info.name ?? "",
+    description: info.description ?? "",
+    help: info.help ?? "",
+  }));
 }
 
 /**
- * Apply a named server-side raster function by exact name from rasterFunctionInfos.
+ * Apply a server-side processing template by name.
  */
-export function applyServerRasterFunction(
+export function applyServerTemplate(layer: ImageryLayer, templateName: string): void {
+  if (!templateName || templateName === "None") {
+    layer.rasterFunction = null as any;
+  } else {
+    layer.rasterFunction = new RasterFunction({ functionName: templateName });
+  }
+  layer.refresh();
+}
+
+/**
+ * Find a server template by fuzzy name match.
+ */
+export function findServerTemplate(layer: ImageryLayer, query: string): string | null {
+  const templates = getServerTemplates(layer);
+  const q = query.toLowerCase();
+  const exact = templates.find((t) => t.name.toLowerCase() === q);
+  if (exact) return exact.name;
+  const sub = templates.find((t) => t.name.toLowerCase().includes(q));
+  return sub?.name ?? null;
+}
+
+// ── Client-side spectral indices ─────────────────────────────────────────────
+
+/**
+ * All available client-side spectral index functions from rasterFunctionUtils.
+ * Grouped by category for UI display.
+ * `defaultArgs` provides default band mappings for common 4-band (R=0, G=1, B=2, NIR=3) sensors.
+ * Users can override band assignments via the panel.
+ */
+export interface SpectralIndexDef {
+  fn: string;
+  label: string;
+  defaultArgs: Record<string, any>;
+  minBands: number;
+}
+
+export const SPECTRAL_INDICES: Record<string, SpectralIndexDef[]> = {
+  "Vegetation": [
+    { fn: "bandArithmeticNDVI", label: "NDVI", defaultArgs: { nirBandId: 3, redBandId: 0 }, minBands: 4 },
+    { fn: "bandArithmeticSAVI", label: "SAVI", defaultArgs: { nirBandId: 3, redBandId: 0, soilBrightnessCorrectionFactor: 0.5 }, minBands: 4 },
+    { fn: "bandArithmeticMSAVI", label: "MSAVI", defaultArgs: { nirBandId: 3, redBandId: 0 }, minBands: 4 },
+    { fn: "bandArithmeticGEMI", label: "GEMI", defaultArgs: { nirBandId: 3, redBandId: 0 }, minBands: 4 },
+    { fn: "bandArithmeticSR", label: "Simple Ratio", defaultArgs: { nirBandId: 3, redBandId: 0 }, minBands: 4 },
+    { fn: "bandArithmeticGNDVI", label: "GNDVI", defaultArgs: { nirBandId: 3, greenBandId: 1 }, minBands: 4 },
+    { fn: "bandArithmeticVARI", label: "VARI", defaultArgs: { redBandId: 0, greenBandId: 1, blueBandId: 2 }, minBands: 3 },
+    { fn: "bandArithmeticMTVI2", label: "MTVI2", defaultArgs: { nirBandId: 3, redBandId: 0, greenBandId: 1 }, minBands: 4 },
+    { fn: "bandArithmeticEVI", label: "EVI", defaultArgs: { nirBandId: 3, redBandId: 0, blueBandId: 2 }, minBands: 4 },
+  ],
+  "Water & Moisture": [
+    { fn: "bandArithmeticNDWI", label: "NDWI", defaultArgs: { nirBandId: 3, greenBandId: 1 }, minBands: 4 },
+    { fn: "bandArithmeticNDMI", label: "NDMI", defaultArgs: { nirBandId: 3, swirBandId: 4 }, minBands: 5 },
+  ],
+  "Built-up": [
+    { fn: "bandArithmeticNDBI", label: "NDBI", defaultArgs: { nirBandId: 3, swirBandId: 4 }, minBands: 5 },
+  ],
+  "Snow & Ice": [
+    { fn: "bandArithmeticNDSI", label: "NDSI", defaultArgs: { nirBandId: 3, swirBandId: 4 }, minBands: 5 },
+  ],
+  "Fire": [
+    { fn: "bandArithmeticNBR", label: "NBR", defaultArgs: { nirBandId: 3, swirBandId: 5 }, minBands: 6 },
+  ],
+  "Minerals & Geology": [
+    { fn: "bandArithmeticIronOxide", label: "Iron Oxide", defaultArgs: { redBandId: 0, blueBandId: 2 }, minBands: 3 },
+    { fn: "bandArithmeticFerrousMinerals", label: "Ferrous Minerals", defaultArgs: { swirBandId: 4, nirBandId: 3 }, minBands: 5 },
+    { fn: "bandArithmeticClayMinerals", label: "Clay Minerals", defaultArgs: { swir1BandId: 4, swir2BandId: 5 }, minBands: 6 },
+  ],
+  "Terrain": [
+    { fn: "slope", label: "Slope", defaultArgs: { slopeType: "degree", zFactor: 1 }, minBands: 1 },
+    { fn: "hillshade", label: "Hillshade", defaultArgs: { altitude: 45, azimuth: 315, zFactor: 1 }, minBands: 1 },
+    { fn: "curvature", label: "Curvature", defaultArgs: { curvatureType: "standard", zFactor: 1 }, minBands: 1 },
+  ],
+};
+
+/** Common band name patterns for resolving band IDs dynamically from service metadata. */
+const BAND_PATTERNS: Record<string, string> = {
+  nirBandId: "b8.?near|nearinfra|^nir|band.?4$",
+  redBandId: "b4.?red|^red|band.?1$",
+  greenBandId: "b3.?green|^green|band.?2$",
+  blueBandId: "b2.?blue|^blue|band.?3$",
+  swirBandId: "b11.?short|shortwave|^swir|band.?5$",
+  swir1BandId: "b11.?short|shortwave",
+  swir2BandId: "b12.?short",
+  redEdgeBandId: "b5.?rededge|rededge",
+};
+
+/**
+ * Resolve band IDs for a spectral index by matching band names from the layer.
+ * Falls back to the hardcoded defaultArgs if name matching fails.
+ */
+function resolveBandArgs(layer: ImageryLayer, defaultArgs: Record<string, any>): Record<string, any> {
+  const bands = getBandInfos(layer);
+  if (bands.length === 0) return defaultArgs;
+
+  const resolved: Record<string, any> = { ...defaultArgs };
+  for (const [key, value] of Object.entries(defaultArgs)) {
+    if (!key.endsWith("BandId") || typeof value !== "number") continue;
+    const pattern = BAND_PATTERNS[key];
+    if (!pattern) continue;
+    const regex = new RegExp(pattern, "i");
+    const match = bands.find((b) => regex.test(b.name.replace(/[\s_]+/g, "")));
+    if (match) {
+      resolved[key] = match.index;
+    }
+  }
+  return resolved;
+}
+
+/**
+ * Apply a client-side raster function by name from rasterFunctionUtils.
+ * Dynamically resolves band IDs from the layer's band names.
+ */
+export function applyClientRasterFunction(
   layer: ImageryLayer,
-  functionName: string
-): void {
-  layer.rasterFunction = new RasterFunction({ functionName });
+  functionName: string,
+  args?: Record<string, any>
+): boolean {
+  const fn = (rasterFunctionUtils as any)[functionName];
+  if (typeof fn !== "function") return false;
+
+  // Look up default args and resolve band IDs dynamically
+  let finalArgs = args;
+  if (!finalArgs) {
+    const allIndices = Object.values(SPECTRAL_INDICES).flat();
+    const match = allIndices.find((idx) => idx.fn === functionName);
+    finalArgs = match?.defaultArgs ?? {};
+  }
+  finalArgs = resolveBandArgs(layer, finalArgs);
+
+  try {
+    console.log(`[rasterFunctions] Applying ${functionName} with args:`, finalArgs);
+    layer.rasterFunction = fn(finalArgs);
+    layer.refresh();
+    return true;
+  } catch (err) {
+    console.error(`[rasterFunctions] Failed to apply ${functionName}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Apply a named raster function — tries server template first, then client-side.
+ */
+export function applyNamedFunction(layer: ImageryLayer, name: string): string {
+  // Try server template match first
+  const serverMatch = findServerTemplate(layer, name);
+  if (serverMatch) {
+    applyServerTemplate(layer, serverMatch);
+    return `Applied server template "${serverMatch}".`;
+  }
+
+  // Try client-side spectral index
+  const allIndices = Object.values(SPECTRAL_INDICES).flat();
+  const match = allIndices.find(
+    (idx) => idx.label.toLowerCase() === name.toLowerCase() ||
+             idx.fn.toLowerCase().includes(name.toLowerCase().replace(/\s+/g, ""))
+  );
+  if (match) {
+    if (applyClientRasterFunction(layer, match.fn)) {
+      return `Applied ${match.label}.`;
+    }
+    return `Failed to apply ${match.label}.`;
+  }
+
+  // Try as raw RasterFunction name
+  layer.rasterFunction = new RasterFunction({ functionName: name });
+  layer.refresh();
+  return `Applied raster function "${name}".`;
+}
+
+/**
+ * Clear raster function — reset to default rendering.
+ */
+export function clearRasterFunction(layer: ImageryLayer): void {
+  layer.rasterFunction = null as any;
   layer.refresh();
 }
 
@@ -188,10 +330,6 @@ export interface PixelIdentifyResult {
   layerTitle: string;
 }
 
-/**
- * Identify pixel values at a map point on an ImageryLayer.
- * Uses the ImageServer REST identify endpoint directly.
- */
 export async function identifyPixel(
   layer: ImageryLayer,
   point: any,
@@ -214,7 +352,6 @@ export async function identifyPixel(
       f: "json",
     });
 
-    // Include raster function if one is applied
     if (layer.rasterFunction) {
       params.set("renderingRule", JSON.stringify(layer.rasterFunction.toJSON()));
     }
@@ -234,10 +371,7 @@ export async function identifyPixel(
 
     return {
       values,
-      location: {
-        longitude: point.longitude,
-        latitude: point.latitude,
-      },
+      location: { longitude: point.longitude, latitude: point.latitude },
       layerTitle: layer.title ?? "Imagery Layer",
     };
   } catch (err) {
@@ -246,50 +380,74 @@ export async function identifyPixel(
   }
 }
 
-// ── Inferno pixel filter (client-side) ───────────────────────────────────────
+// ── Band info helpers ────────────────────────────────────────────────────────
+
+export interface BandInfo {
+  index: number;
+  name: string;
+}
+
+export function getBandInfos(layer: ImageryLayer): BandInfo[] {
+  // The canonical path is layer.serviceRasterInfo.bandInfos (ArcGISImageService mixin).
+  // serviceRasterInfo is only available after the layer is loaded.
+  const rasterInfo = (layer as any).serviceRasterInfo;
+
+  if (rasterInfo?.bandInfos && Array.isArray(rasterInfo.bandInfos) && rasterInfo.bandInfos.length > 0) {
+    return rasterInfo.bandInfos.map((b: any, i: number) => ({
+      index: i,
+      name: b.name ?? `Band ${i + 1}`,
+    }));
+  }
+
+  // Fall back to band count
+  const count = rasterInfo?.bandCount ?? (layer as any).sourceJSON?.bandCount ?? 0;
+  if (count > 0) {
+    // Try to get band names from sourceJSON
+    const srcBands = (layer as any).sourceJSON?.bandInfos;
+    if (Array.isArray(srcBands) && srcBands.length === count) {
+      return srcBands.map((b: any, i: number) => ({
+        index: i,
+        name: b.bandName ?? b.name ?? `Band ${i + 1}`,
+      }));
+    }
+    return Array.from({ length: count }, (_, i) => ({ index: i, name: `Band ${i + 1}` }));
+  }
+
+  return [];
+}
+
+/** Band combination preset — uses band name patterns to find correct indices dynamically. */
+export interface BandPreset {
+  label: string;
+  /** Band name patterns for [R, G, B] channels. Matched against band names case-insensitively. */
+  bandPatterns: [string, string, string];
+}
+
+export const BAND_PRESETS: BandPreset[] = [
+  { label: "Natural Color", bandPatterns: ["b4.?red|^red", "b3.?green|^green", "b2.?blue|^blue"] },
+  { label: "Color Infrared (CIR)", bandPatterns: ["b8.?near|nearinfra|^nir", "b4.?red|^red", "b3.?green|^green"] },
+  { label: "False Color (vegetation)", bandPatterns: ["b8.?near|nearinfra|^nir", "b3.?green|^green", "b2.?blue|^blue"] },
+  { label: "Short-Wave IR", bandPatterns: ["b11.?short|shortwave|^swir", "b8.?near|nearinfra|^nir", "b4.?red|^red"] },
+  { label: "Agriculture", bandPatterns: ["b11.?short|shortwave|^swir", "b8.?near|nearinfra|^nir", "b3.?green|^green"] },
+  { label: "Geology", bandPatterns: ["b12.?short|shortwave", "b11.?short|shortwave", "b4.?red|^red"] },
+];
 
 /**
- * Create a pixel filter function that applies an inferno color ramp.
- * Useful for single-band thermal data rendered client-side.
+ * Resolve a band preset to actual 0-based band indices using the layer's band names.
+ * Returns null if any band pattern can't be matched.
  */
-export function createInfernoPixelFilter(
-  minVal: number = 0,
-  maxVal: number = 255
-): (pixelData: any) => void {
-  return (pixelData: any) => {
-    const pb = pixelData.pixelBlock;
-    if (!pb || !pb.pixels || !pb.pixels[0]) return;
+export function resolvePresetBands(preset: BandPreset, bands: BandInfo[]): number[] | null {
+  const result: number[] = [];
+  for (const pattern of preset.bandPatterns) {
+    const regex = new RegExp(pattern, "i");
+    const match = bands.find((b) => regex.test(b.name.replace(/[\s_]+/g, "")));
+    if (!match) return null;
+    result.push(match.index);
+  }
+  return result;
+}
 
-    const src = pb.pixels[0];
-    const count = src.length;
-    const r = new Uint8Array(count);
-    const g = new Uint8Array(count);
-    const b = new Uint8Array(count);
-    const mask = pb.mask || new Uint8Array(count).fill(1);
-
-    const range = maxVal - minVal || 1;
-
-    for (let i = 0; i < count; i++) {
-      const t = src[i];
-      if (t < minVal || t > maxVal) {
-        mask[i] = 0;
-        continue;
-      }
-      mask[i] = 1;
-      const norm = (t - minVal) / range;
-      const idx = Math.floor(norm * (INFERNO_STOPS.length - 1));
-      const frac =
-        norm * (INFERNO_STOPS.length - 1) - idx;
-      const c0 = INFERNO_STOPS[Math.min(idx, INFERNO_STOPS.length - 1)];
-      const c1 =
-        INFERNO_STOPS[Math.min(idx + 1, INFERNO_STOPS.length - 1)];
-      r[i] = Math.round(c0[0] + frac * (c1[0] - c0[0]));
-      g[i] = Math.round(c0[1] + frac * (c1[1] - c0[1]));
-      b[i] = Math.round(c0[2] + frac * (c1[2] - c0[2]));
-    }
-
-    pb.pixels = [r, g, b];
-    pb.mask = mask;
-    pb.pixelType = "u8";
-  };
+export function applyBandCombination(layer: ImageryLayer, bandIds: number[]): void {
+  layer.bandIds = bandIds;
+  layer.refresh();
 }

@@ -398,9 +398,36 @@ export function registerLayerInfoAgent(assistant: HTMLElement) {
         const IMAGERY_TYPES = new Set(["imagery", "imagery-tile"]);
 
         if (IMAGERY_TYPES.has(targetLayer.type)) {
+          // For imagery layers, enable click-to-identify pixel values directly
+          const imgView = getCurrentView() as any;
+          if (imgView) {
+            const { identifyPixel } = await import("../utils/rasterFunctions");
+            // Remove any existing click handler
+            if ((window as any).__imgIdentifyRemove) {
+              (window as any).__imgIdentifyRemove();
+            }
+            // Disable default popup so our custom identify popup works
+            imgView.popupEnabled = false;
+            const handler = imgView.on("click", async (event: any) => {
+              event.stopPropagation();
+              const result = await identifyPixel(targetLayer as any, event.mapPoint, imgView);
+              if (!result) return;
+              imgView.openPopup({
+                title: result.layerTitle,
+                content: `Pixel values: ${result.values.join(", ")}<br>Location: ${result.location.longitude.toFixed(5)}, ${result.location.latitude.toFixed(5)}`,
+                location: event.mapPoint,
+              });
+            });
+            (window as any).__imgIdentifyRemove = () => {
+              handler.remove();
+              imgView.popupEnabled = true;
+            };
+            return {
+              outputMessage: `Click-to-identify enabled on "${targetLayer.title}". Click any location to see pixel/band values.`,
+            };
+          }
           return {
-            outputMessage: `"${targetLayer.title}" is an imagery layer — it doesn't have attribute fields. ` +
-              `Try saying **"enable identify popup"** to click on the imagery and see pixel/band values.`,
+            outputMessage: `"${targetLayer.title}" is an imagery layer. Say **"identify"** to click and see pixel values.`,
           };
         }
 

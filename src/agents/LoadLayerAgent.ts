@@ -14,8 +14,9 @@ import { getCurrentView, getCurrentViewType, requestViewSwitch, requestWebMapSwi
 import ImageryLayer from "@arcgis/core/layers/ImageryLayer";
 import {
   applyStretch,
-  applyServerRasterFunction,
-  getAvailableRasterFunctions,
+  applyServerTemplate,
+  getServerTemplates,
+  findServerTemplate,
   type StretchType,
 } from "../utils/rasterFunctions";
 import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, findLayerByTitle, elapsed, AGENT_KEYWORDS } from "../utils/agentHelpers";
@@ -213,18 +214,19 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
           if (typeof target.load === "function" && target.loadStatus !== "loaded") {
             try { await withTimeout(target.load(), 30000, `Load "${target.title}"`); } catch { /* continue */ }
           }
-          let zoomExtent: any = null;
-          const qLayer = typeof target.queryExtent === "function"
-            ? target
-            : target.layers?.toArray?.()?.find((sl: any) => typeof sl.queryExtent === "function") ?? null;
-          if (qLayer) {
-            try {
-              if (qLayer.loadStatus !== "loaded" && typeof qLayer.load === "function") await qLayer.load();
-              const result = await qLayer.queryExtent();
-              zoomExtent = result?.extent;
-            } catch { /* fall through */ }
+          let zoomExtent: any = target.fullExtent;
+          if (!zoomExtent) {
+            const qLayer = typeof target.queryExtent === "function"
+              ? target
+              : target.layers?.toArray?.()?.find((sl: any) => typeof sl.queryExtent === "function") ?? null;
+            if (qLayer) {
+              try {
+                if (qLayer.loadStatus !== "loaded" && typeof qLayer.load === "function") await qLayer.load();
+                const result = await withTimeout(qLayer.queryExtent(), 5000, "queryExtent");
+                zoomExtent = result?.extent;
+              } catch { /* timeout or error */ }
+            }
           }
-          if (!zoomExtent) zoomExtent = target.fullExtent;
           if (!zoomExtent) {
             try {
               const lv = await activeView.whenLayerView(target);
@@ -521,22 +523,22 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
         await withTimeout(layer.load(), 30000, `Load "${displayName}"`);
         console.log("[LoadLayer] Layer loaded. Type:", layer.type);
 
-        // Zoom to layer extent. For queryable layers, queryExtent returns the true data extent.
-        // Group layers (OrientedImageryLayer): find a queryable sublayer for extent.
-        let zoomTarget: any = null;
-        const queryableLayer = typeof layer.queryExtent === "function"
-          ? layer
-          : layer.layers?.toArray?.()?.find((sl: any) => typeof sl.queryExtent === "function") ?? null;
-        if (queryableLayer) {
-          try {
-            if (queryableLayer.loadStatus !== "loaded" && typeof queryableLayer.load === "function") {
-              await queryableLayer.load();
-            }
-            const result = await queryableLayer.queryExtent();
-            zoomTarget = result?.extent;
-          } catch { /* fall through */ }
+        // Zoom to layer extent. Prefer fullExtent (instant) over queryExtent (slow on large services).
+        let zoomTarget: any = layer.fullExtent;
+        if (!zoomTarget) {
+          const queryableLayer = typeof layer.queryExtent === "function"
+            ? layer
+            : layer.layers?.toArray?.()?.find((sl: any) => typeof sl.queryExtent === "function") ?? null;
+          if (queryableLayer) {
+            try {
+              if (queryableLayer.loadStatus !== "loaded" && typeof queryableLayer.load === "function") {
+                await queryableLayer.load();
+              }
+              const result = await withTimeout(queryableLayer.queryExtent(), 5000, "queryExtent");
+              zoomTarget = result?.extent;
+            } catch { /* timeout or error — fall through */ }
+          }
         }
-        if (!zoomTarget) zoomTarget = layer.fullExtent;
         if (!zoomTarget) {
           try {
             const lv = await activeView.whenLayerView(layer);
@@ -583,14 +585,14 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
           const textLower = text.toLowerCase();
 
           let serverFnApplied = false;
-          const availableFns = getAvailableRasterFunctions(imgLayer);
-          if (availableFns.length > 0) {
-            const matchedFn = availableFns.find(
-              (fn) => fn !== "None" && textLower.includes(fn.toLowerCase())
+          const templates = getServerTemplates(imgLayer);
+          if (templates.length > 0) {
+            const matchedFn = templates.find(
+              (t) => t.name !== "None" && textLower.includes(t.name.toLowerCase())
             );
             if (matchedFn) {
-              applyServerRasterFunction(imgLayer, matchedFn);
-              results.push(`Applied "${matchedFn}" processing template.`);
+              applyServerTemplate(imgLayer, matchedFn.name);
+              results.push(`Applied "${matchedFn.name}" processing template.`);
               serverFnApplied = true;
             }
           }

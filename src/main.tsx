@@ -10,6 +10,15 @@ import "@esri/calcite-components/components/calcite-icon";
 import "@esri/calcite-components/components/calcite-loader";
 import "@esri/calcite-components/components/calcite-segmented-control";
 import "@esri/calcite-components/components/calcite-segmented-control-item";
+import "@esri/calcite-components/components/calcite-tabs";
+import "@esri/calcite-components/components/calcite-tab-nav";
+import "@esri/calcite-components/components/calcite-tab-title";
+import "@esri/calcite-components/components/calcite-tab";
+import "@esri/calcite-components/components/calcite-select";
+import "@esri/calcite-components/components/calcite-option";
+import "@esri/calcite-components/components/calcite-option-group";
+import "@esri/calcite-components/components/calcite-label";
+import "@esri/calcite-components/components/calcite-checkbox";
 
 // ArcGIS Map component registrations
 import "@arcgis/map-components/main.css";
