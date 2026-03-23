@@ -4,6 +4,7 @@ import RasterStretchRenderer from "@arcgis/core/renderers/RasterStretchRenderer"
 import MultipartColorRamp from "@arcgis/core/rest/support/MultipartColorRamp";
 import AlgorithmicColorRamp from "@arcgis/core/rest/support/AlgorithmicColorRamp";
 import Color from "@arcgis/core/Color";
+import { safeFetch, appendToken } from "./safeFetch";
 
 // ── Stretch types ────────────────────────────────────────────────────────────
 
@@ -218,7 +219,8 @@ export async function identifyPixel(
       params.set("renderingRule", JSON.stringify(layer.rasterFunction.toJSON()));
     }
 
-    const resp = await fetch(`${layer.url}/identify?${params}`);
+    const identifyUrl = appendToken(`${layer.url}/identify?${params}`);
+    const resp = await safeFetch(identifyUrl);
     const data = await resp.json();
 
     if (!data || data.value === undefined || data.value === "NoData") return null;

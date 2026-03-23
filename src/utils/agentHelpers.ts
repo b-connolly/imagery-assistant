@@ -2,6 +2,15 @@ import {
   Annotation as ANNOTATION,
 } from "@langchain/langgraph/web";
 
+// ── Debug logging ───────────────────────────────────────────────────────────
+
+const DEBUG = import.meta.env.DEV;
+
+/** Log only in development mode. Use instead of console.log for non-error output. */
+export const log = (...args: any[]) => {
+  if (DEBUG) console.log("[ImageryAssistant]", ...args);
+};
+
 // ── Layer type constants ────────────────────────────────────────────────────
 
 /** Layer types that require a 3D SceneView (runtime type strings from the SDK) */
@@ -15,6 +24,45 @@ export const REQUIRES_3D = new Set([
   "voxel",
   "dimension",
 ]);
+
+/**
+ * Check if a portal item type string represents a 3D-only layer.
+ * Uses REQUIRES_3D as the source of truth, plus portal type name heuristics.
+ */
+export function is3DItemType(itemType: string): boolean {
+  const lower = itemType.toLowerCase();
+  // Check against canonical runtime types
+  for (const t of REQUIRES_3D) {
+    if (lower.includes(t)) return true;
+  }
+  // Portal type names use different conventions than SDK runtime types
+  return (
+    lower.includes("scene") ||
+    lower.includes("3dtiles") ||
+    lower.includes("gaussian") ||
+    lower.includes("point cloud") ||
+    lower.includes("building") ||
+    lower.includes("voxel")
+  );
+}
+
+// ── Agent keyword patterns for bailout checks ──────────────────────────────
+// Each agent defines the keywords it owns. Other agents test against these
+// to decide whether to bail out and let the owning agent handle the request.
+// Centralized here so keyword changes only need to happen in one place.
+
+export const AGENT_KEYWORDS = {
+  imagery: /\b(stretch|std\s*dev|standard\s*deviation|min[\s-]*max|percent[\s-]*clip|color\s*ramp|inferno|viridis|grayscale|ndvi|hillshade|slope|aspect|identify|popup|screenshot|raster\s*function|processing\s*template|render|visualize|color\s*ir|false\s*color)\b/i,
+  layerInfo: /\b(describe|info|information|details|metadata|fields|attributes|schema|properties|capabilities|statistics|stats|band\s*count|pixel\s*type|sublayers?|what\s*(is|are)|tell\s*me\s*about|query|filter|where\s*clause|select\b|create\s*pop|add\s*pop|set\s*pop|configure\s*pop|pop\s*up)\b/i,
+  measurement: /\b(measure|measurement|measuring|ruler|elevation\s*profile|cross[- ]?section|distance|area|volume|cut\s*(?:and|&)?\s*fill|stockpile|excavat|earthwork|grading|how\s*far)\b/i,
+  elevationOffset: /\b(fix|adjust|correct|offset|raise|lower|shift)\s*(the\s+)?(elevation|height|altitude|z[- ]?offset|vertical|floating|underground|mesh|layer)/i,
+  elevationOffsetSimple: /\b(floating|underground|misaligned)\b/i,
+  pointCloud: /\b(class[\s_-]?code|classification|filter\s*(point|class|ground|vegetation|building|water)|color\s*by\s*(elevation|intensity|class|rgb|return)|point\s*(?:cloud\s*)?size|point\s*(?:cloud\s*)?density|points?\s*per\s*inch|lidar|las\b|return[\s_-]?number|point\s*cloud\b)/i,
+  swipe: /\b(compare|swipe|split|side\s*by\s*side|versus|vs\.?)\b/i,
+  capabilities: /\b(what\s*can\s*you\s*do|capabilities|help me|what\s*tools|what\s*agents)\b/i,
+  search: /\b(search|find|browse|discover|look\s*up)\b/i,
+  scopedContent: /\b(my\s+content|my\s+org|living\s*atlas|arcgis\s*online)\b/i,
+} as const;
 
 // ── Message extraction ──────────────────────────────────────────────────────
 

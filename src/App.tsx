@@ -20,7 +20,6 @@ import {
 } from "./utils/viewManager";
 import ViewToggle from "./components/ViewToggle";
 import { registerLoadLayerAgent } from "./agents/LoadLayerAgent";
-import { registerAllCapabilitiesAgent } from "./agents/AllCapabilitiesAgent";
 import { registerImageryAnalysisAgent } from "./agents/ImageryAnalysisAgent";
 import { registerElevationOffsetAgent } from "./agents/ElevationOffsetAgent";
 import { registerContentSearchAgent } from "./agents/ContentSearchAgent";
@@ -47,7 +46,6 @@ function registerCustomAgents(assistant: HTMLElement) {
   registerSwipeAgent(assistant);
   registerLayerInfoAgent(assistant);
   registerPointCloudAgent(assistant);
-  registerAllCapabilitiesAgent(assistant);
 }
 
 export default function App() {

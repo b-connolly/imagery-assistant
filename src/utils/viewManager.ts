@@ -2,6 +2,7 @@ import type MapView from "@arcgis/core/views/MapView";
 import type SceneView from "@arcgis/core/views/SceneView";
 import type Layer from "@arcgis/core/layers/Layer";
 import type Viewpoint from "@arcgis/core/Viewpoint";
+import { withTimeout } from "./safeFetch";
 
 export type ViewType = "2d" | "3d";
 export type AnyView = MapView | SceneView;
@@ -105,7 +106,7 @@ export function requestViewSwitch(targetType: ViewType): Promise<AnyView> {
     return Promise.reject(new Error("View switch handler not registered."));
   }
 
-  return new Promise((resolve) => {
+  const pending = new Promise<AnyView>((resolve) => {
     // Listen for the next view change event
     const unlisten = onViewChange((view, vt) => {
       if (vt === targetType) {
@@ -116,6 +117,8 @@ export function requestViewSwitch(targetType: ViewType): Promise<AnyView> {
     // Trigger the switch via the React handler
     viewSwitchHandler!(targetType);
   });
+
+  return withTimeout(pending, 30000, `Switch to ${targetType} view`);
 }
 
 // ── Programmatic web map / web scene switching ───────────────────────────────
@@ -149,13 +152,15 @@ export function requestWebMapSwitch(itemId: string): Promise<AnyView> {
     return Promise.reject(new Error("Web map switch handler not registered."));
   }
 
-  return new Promise((resolve) => {
+  const pending = new Promise<AnyView>((resolve) => {
     const unlisten = onViewChange((view) => {
       unlisten();
       resolve(view);
     });
     webMapSwitchHandler!(itemId);
   });
+
+  return withTimeout(pending, 30000, `Load web map ${itemId}`);
 }
 
 /**
@@ -168,11 +173,13 @@ export function requestWebSceneSwitch(itemId: string): Promise<AnyView> {
     return Promise.reject(new Error("Web scene switch handler not registered."));
   }
 
-  return new Promise((resolve) => {
+  const pending = new Promise<AnyView>((resolve) => {
     const unlisten = onViewChange((view) => {
       unlisten();
       resolve(view);
     });
     webSceneSwitchHandler!(itemId);
   });
+
+  return withTimeout(pending, 30000, `Load web scene ${itemId}`);
 }

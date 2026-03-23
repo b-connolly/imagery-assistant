@@ -5,6 +5,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getCurrentView, getCurrentViewType, requestViewSwitch, getOperationalLayers, onViewChange } from "../utils/viewManager";
 import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, findLayerByTitle , elapsed } from "../utils/agentHelpers";
+import { withTimeout } from "../utils/safeFetch";
 
 // ── Extraction tool ──────────────────────────────────────────────────────────
 
@@ -203,16 +204,18 @@ export function registerElevationOffsetAgent(assistant: HTMLElement) {
       }
 
       try {
-        if (ground.load) await ground.load();
+        if (ground.load) await withTimeout(ground.load(), 30000, "Ground surface load");
         // Also load individual elevation layers — ground.load() alone
         // doesn't guarantee the elevation layer data is fetched.
         if (ground.layers?.length > 0) {
           await Promise.all(
-            ground.layers.map((l: any) => l.load?.()).filter(Boolean)
+            ground.layers.map((l: any) =>
+              l.load ? withTimeout(l.load(), 30000, `Elevation layer "${l.title}"`) : Promise.resolve()
+            )
           );
         }
-      } catch {
-        // Non-critical
+      } catch (err) {
+        console.warn("[ElevOffset] Ground load failed (non-critical):", err);
       }
       console.log("[ElevOffset] Ground ready:", ground, "elevation layers:", ground.layers?.length);
 
@@ -266,7 +269,7 @@ export function registerElevationOffsetAgent(assistant: HTMLElement) {
         };
       }
 
-      await layer.load();
+      await withTimeout(layer.load(), 30000, `Load "${layer.title}"`);
       const layerAny = layer as any;
       const currentElevInfo = layerAny.elevationInfo;
       const currentOffset: number = currentElevInfo?.offset ?? 0;
@@ -293,7 +296,7 @@ export function registerElevationOffsetAgent(assistant: HTMLElement) {
             const ground = view.map?.ground;
             if (!ground) return;
 
-            const result = await ground.queryElevation(event.mapPoint);
+            const result = await withTimeout(ground.queryElevation(event.mapPoint), 15000, "Query elevation at click point");
             const terrainZ = result.geometry?.z ?? 0;
 
             // Apply offset
@@ -407,7 +410,7 @@ export function registerElevationOffsetAgent(assistant: HTMLElement) {
           points: sampleCoords,
           spatialReference,
         });
-        const result = await ground.queryElevation(multipoint);
+        const result = await withTimeout(ground.queryElevation(multipoint), 30000, "Query terrain elevation samples");
         const sampledPoints = (result.geometry as any).points as number[][];
         const validZs = sampledPoints.map((p: number[]) => p[2]).filter((z: number) => isFinite(z));
 

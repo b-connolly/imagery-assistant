@@ -5,12 +5,19 @@ import {
   type ScopedSearchResults,
   type PortalSearchResult,
 } from "../utils/portalSearch";
-import { createLayerFromUrl, createLayerFromItemId, isElevationService, addElevationLayerToGround } from "../utils/layerFactory";
-import { getCurrentView, getCurrentViewType, requestViewSwitch, requestWebMapSwitch, requestWebSceneSwitch } from "../utils/viewManager";
-import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement , elapsed } from "../utils/agentHelpers";
+import { createLayerFromUrl, createLayerFromItemId, isElevationService, handleElevationRouting } from "../utils/layerFactory";
+import { getCurrentView, getCurrentViewType, requestViewSwitch, requestWebMapSwitch, requestWebSceneSwitch, onViewChange } from "../utils/viewManager";
+import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, elapsed, is3DItemType, AGENT_KEYWORDS } from "../utils/agentHelpers";
+import { withTimeout } from "../utils/safeFetch";
 
 // ── Cached search results for "add result N" follow-ups ──────────────────────
 let lastSearchResults: ScopedSearchResults[] = [];
+
+// Clear stale cached results when the map/view changes (e.g., user loads a different web map)
+// Listener is app-scoped — registered once at module load, lives for the app lifetime.
+onViewChange(() => {
+  lastSearchResults = [];
+});
 
 // ── Result extraction helpers ────────────────────────────────────────────────
 
@@ -168,22 +175,7 @@ function getAllResults(scopedResults: ScopedSearchResults[]): PortalSearchResult
   return scopedResults.flatMap(({ results }) => results);
 }
 
-/**
- * Determine if a portal item type string represents a 3D-only layer.
- */
-function is3DItemType(itemType: string): boolean {
-  const lower = itemType.toLowerCase();
-  return (
-    lower.includes("scene") ||
-    lower.includes("3d") ||
-    lower.includes("3dtiles") ||
-    lower.includes("gaussian") ||
-    lower.includes("integrated mesh") ||
-    lower.includes("point cloud") ||
-    lower.includes("building") ||
-    lower.includes("voxel")
-  );
-}
+// is3DItemType is now imported from agentHelpers (single source of truth)
 
 /**
  * Add multiple layers to the map. Switches to 3D if any layer requires it.
@@ -241,21 +233,10 @@ async function addMultipleResultsToMap(
       // route it to ground.layers instead of operational layers
       if (layer.type === "elevation") {
         const urlOrId = target.url ?? target.itemId;
-        const elevLayer = addElevationLayerToGround(view, urlOrId, target.title);
-        try {
-          await elevLayer.load();
-        } catch (loadErr: any) {
-          const elapsedTime = elapsed(lt0);
-          // Spatial reference mismatch is common for elevation services
-          if (loadErr?.name?.includes("spatial-reference") || loadErr?.message?.includes("spatial reference")) {
-            console.warn("[ContentSearch] Elevation SR incompatible:", target.title);
-            return `Added "${target.title}" as elevation surface but its spatial reference may be incompatible with the current view (${elapsedTime}s)`;
-          }
-          throw loadErr;
-        }
+        const result = await handleElevationRouting(urlOrId, target.title);
         const elapsedTime = elapsed(lt0);
-        console.log("[ContentSearch] Added elevation surface:", target.title, `(${elapsedTime}s)`);
-        return `Added "${target.title}" as terrain elevation surface (${elapsedTime}s)`;
+        console.log("[ContentSearch] Elevation routing:", target.title, `(${elapsedTime}s)`);
+        return `${result} (${elapsedTime}s)`;
       }
 
       // Skip 3D-only layers in 2D view
@@ -264,7 +245,7 @@ async function addMultipleResultsToMap(
       }
 
       view.map!.layers.add(layer);
-      await layer.load();
+      await withTimeout(layer.load(), 30000, `Load "${target.title}"`);
 
       // Zoom to the layer — tilt camera for 3D content so it's visible.
       // Some layers (e.g., OrientedImageryLayer, CatalogLayer) don't populate
@@ -319,50 +300,24 @@ export function registerContentSearchAgent(assistant: HTMLElement) {
       // ── Bail out: defer to other agents unless this is explicitly a search ──
       // ContentSearchAgent should ONLY handle portal searches. If the user isn't
       // explicitly searching/finding/browsing, check if the request belongs elsewhere.
-      const isSearchRequest = /\b(search|find|browse|discover|look\s*up)\b/i.test(text);
+      const isSearchRequest = AGENT_KEYWORDS.search.test(text);
 
       if (!isSearchRequest) {
-        // ImageryAnalysisAgent keywords
-        if (/\b(stretch|std\s*dev|standard\s*deviation|min[\s-]*max|percent[\s-]*clip|color\s*ramp|inferno|viridis|grayscale|ndvi|hillshade|slope|aspect|identify|popup|screenshot|raster\s*function|processing\s*template|render|visualize|color\s*ir|false\s*color)\b/i.test(text)) {
-          console.log("[ContentSearch] Skipping — ImageryAnalysisAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // LayerInfoAgent keywords
-        if (/\b(describe|info|information|details|metadata|fields|attributes|schema|properties|capabilities|statistics|stats|band\s*count|pixel\s*type|sublayers?|what\s*(is|are)|tell\s*me\s*about|query|filter|where\s*clause|select\b|create\s*pop|add\s*pop|set\s*pop|configure\s*pop|pop\s*up)\b/i.test(text)) {
-          console.log("[ContentSearch] Skipping — LayerInfoAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // MeasurementAgent keywords
-        if (/\b(measure|measurement|measuring|ruler|elevation\s*profile|cross[- ]?section|distance|area|volume|cut\s*(?:and|&)?\s*fill|stockpile|excavat|earthwork|grading|how\s*far)\b/i.test(text)) {
-          console.log("[ContentSearch] Skipping — MeasurementAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // ElevationOffsetAgent keywords
-        if (/\b(fix|adjust|correct|offset|raise|lower|shift)\s*(the\s+)?(elevation|height|altitude|z[- ]?offset|vertical|floating|underground|mesh|layer)/i.test(text) ||
-            /\b(floating|underground|misaligned)\b/i.test(text)) {
-          console.log("[ContentSearch] Skipping — ElevationOffsetAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // PointCloudAgent keywords
-        if (/\b(class[\s_-]?code|classification|filter\s*(point|class|ground|vegetation|building|water)|color\s*by\s*(elevation|intensity|class|rgb|return)|point\s*size|point\s*density|points?\s*per\s*inch|lidar|las\b|return[\s_-]?number)\b/i.test(text)) {
-          console.log("[ContentSearch] Skipping — PointCloudAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // SwipeAgent keywords
-        if (/\b(compare|swipe|split|side\s*by\s*side|versus|vs\.?)\b/i.test(text)) {
-          console.log("[ContentSearch] Skipping — SwipeAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // AllCapabilitiesAgent keywords
-        if (/\b(what\s*can\s*you\s*do|capabilities|help me|what\s*tools|what\s*agents)\b/i.test(text)) {
-          console.log("[ContentSearch] Skipping — AllCapabilitiesAgent territory.");
-          return { outputMessage: "" };
+        const bailoutChecks = [
+          { pattern: AGENT_KEYWORDS.imagery, label: "ImageryAnalysisAgent" },
+          { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
+          { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
+          { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
+          { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
+          { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
+          { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
+          { pattern: AGENT_KEYWORDS.capabilities, label: "AllCapabilitiesAgent" },
+        ];
+        for (const { pattern, label } of bailoutChecks) {
+          if (pattern.test(text)) {
+            console.log(`[ContentSearch] Skipping — ${label} territory.`);
+            return { outputMessage: "" };
+          }
         }
 
         // LoadLayerAgent: remove/delete/zoom commands (not "add" since that overlaps with search results)

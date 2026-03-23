@@ -253,6 +253,53 @@ export function addElevationLayerToGround(
   return layer;
 }
 
+// ── Shared elevation routing ─────────────────────────────────────────────────
+
+import { getCurrentView, getCurrentViewType, requestViewSwitch } from "./viewManager";
+import { withTimeout } from "./safeFetch";
+
+/**
+ * Handle elevation layer routing: switch to 3D, add to ground, zoom.
+ * Used by both LoadLayerAgent and ContentSearchAgent to avoid duplication.
+ * Returns a user-facing message string.
+ */
+export async function handleElevationRouting(
+  urlOrItemId: string,
+  displayName: string
+): Promise<string> {
+  // Elevation requires 3D SceneView
+  if (getCurrentViewType() !== "3d") {
+    try {
+      await requestViewSwitch("3d");
+      await new Promise((r) => setTimeout(r, 1000));
+    } catch {
+      return (
+        `"${displayName}" is an elevation surface and requires 3D. ` +
+        "Please switch to 3D using the toggle, then try again."
+      );
+    }
+  }
+
+  const activeView = getCurrentView() as any;
+  if (!activeView?.map?.ground) {
+    return "No active 3D scene view. Switch to 3D and try again.";
+  }
+
+  const elevLayer = addElevationLayerToGround(activeView, urlOrItemId, displayName);
+  await withTimeout(elevLayer.load(), 30000, `Load elevation "${displayName}"`);
+
+  if (elevLayer.fullExtent) {
+    try {
+      await activeView.goTo(
+        { target: elevLayer.fullExtent, tilt: 65 } as any,
+        { duration: 2000 }
+      );
+    } catch { /* non-critical */ }
+  }
+
+  return `Added "${displayName}" as terrain elevation surface.`;
+}
+
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
 /**

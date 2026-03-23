@@ -7,6 +7,7 @@ import {
   elapsed,
 } from "../utils/agentHelpers";
 import { getCurrentView } from "../utils/viewManager";
+import { withTimeout } from "../utils/safeFetch";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,9 +46,10 @@ interface LayerSummary {
 async function ensureLoaded(layer: any): Promise<void> {
   if (typeof layer.load === "function" && layer.loadStatus !== "loaded") {
     try {
-      await layer.load();
-    } catch {
+      await withTimeout(layer.load(), 30000, `Load "${layer.title ?? "layer"}"`);
+    } catch (err) {
       // Some layers may fail to load fully; continue with whatever is available
+      console.warn("[LayerInfo] Layer load failed (continuing with partial data):", err);
     }
   }
 }
@@ -409,7 +411,7 @@ export function registerLayerInfoAgent(assistant: HTMLElement) {
         }
 
         // Ensure layer is loaded so fields are available
-        try { await targetLayer.load(); } catch { /* continue */ }
+        try { await withTimeout(targetLayer.load(), 30000, `Load "${targetLayer.title}"`); } catch { /* continue */ }
 
         // If no fields specified, use all available fields
         if (fieldNames.length === 0 && targetLayer.fields) {

@@ -98,16 +98,21 @@ function quickExtract(text: string): PointCloudIntent | null {
     }
   }
 
-  // Point size: "set point size to 4" / "bigger points" / "smaller points"
-  const sizeMatch = text.match(/\bpoint\s*size\b[^\d]*(\d+)/i);
+  // Point size: "set point size to 4" / "point cloud size to 4" / "bigger points"
+  const sizeMatch = text.match(/\bpoint\s*(?:cloud\s*)?size\b[^\d]*(\d+)/i);
   if (sizeMatch) {
     return { action: "point-size", layerName: null, symbology: null, ...noFilter, pointSize: parseInt(sizeMatch[1], 10), density: null };
   }
   if (/\b(bigger|larger|increase)\s*(point|size)/i.test(text)) {
-    return { action: "point-size", layerName: null, symbology: null, ...noFilter, pointSize: -1, density: null }; // relative increase
+    return { action: "point-size", layerName: null, symbology: null, ...noFilter, pointSize: -1, density: null };
   }
   if (/\b(smaller|reduce|decrease)\s*(point|size)/i.test(text)) {
-    return { action: "point-size", layerName: null, symbology: null, ...noFilter, pointSize: -2, density: null }; // relative decrease
+    return { action: "point-size", layerName: null, symbology: null, ...noFilter, pointSize: -2, density: null };
+  }
+  // Catch "size to N" when preceded by point cloud context
+  const genericSizeMatch = text.match(/\bsize\b[^\d]*(\d+)/i);
+  if (genericSizeMatch && /point\s*cloud/i.test(text)) {
+    return { action: "point-size", layerName: null, symbology: null, ...noFilter, pointSize: parseInt(genericSizeMatch[1], 10), density: null };
   }
 
   // Density: "set density to 20" / "more points" / "fewer points"
@@ -315,29 +320,41 @@ export function registerPointCloudAgent(assistant: HTMLElement) {
           }
 
           case "point-size": {
-            const current = (layer as any).pointSizeAlgorithm?.size ?? 3;
+            // pointSizeAlgorithm lives on the renderer, not the layer
+            const renderer = layer.renderer as any;
+            const current = renderer?.pointSizeAlgorithm?.size ?? 3;
             let newSize: number;
             if (intent.pointSize === -1) newSize = Math.min(current + 2, 20);
             else if (intent.pointSize === -2) newSize = Math.max(current - 2, 1);
             else newSize = Math.max(1, Math.min(intent.pointSize!, 30));
 
-            // Set via fixed-size algorithm
-            (layer as any).pointSizeAlgorithm = {
-              type: "fixed-size",
-              useRealWorldSymbolSizes: false,
-              size: newSize,
-            };
+            if (renderer) {
+              // Clone renderer to trigger reactivity
+              const cloned = renderer.clone();
+              cloned.pointSizeAlgorithm = {
+                type: "fixed-size",
+                useRealWorldSymbolSizes: false,
+                size: newSize,
+              };
+              layer.renderer = cloned;
+            }
             return { outputMessage: `Point size set to **${newSize}** for "${layer.title}".` };
           }
 
           case "density": {
-            const currentDensity = (layer as any).pointsPerInch ?? 10;
+            // pointsPerInch lives on the renderer, not the layer
+            const densRenderer = layer.renderer as any;
+            const currentDensity = densRenderer?.pointsPerInch ?? 10;
             let newDensity: number;
             if (intent.density === -1) newDensity = Math.min(currentDensity + 10, 100);
             else if (intent.density === -2) newDensity = Math.max(currentDensity - 10, 1);
             else newDensity = Math.max(1, Math.min(intent.density!, 100));
 
-            (layer as any).pointsPerInch = newDensity;
+            if (densRenderer) {
+              const cloned = densRenderer.clone();
+              cloned.pointsPerInch = newDensity;
+              layer.renderer = cloned;
+            }
             return { outputMessage: `Point density set to **${newDensity} points/inch** for "${layer.title}".` };
           }
 
@@ -359,7 +376,8 @@ export function registerPointCloudAgent(assistant: HTMLElement) {
 
           case "info": {
             const fields = layer.fields?.map((f: any) => f.name).join(", ") ?? "N/A";
-            const ppi = (layer as any).pointsPerInch ?? "default";
+            const infoRenderer = layer.renderer as any;
+            const ppi = infoRenderer?.pointsPerInch ?? "default";
             return {
               outputMessage:
                 `**${layer.title}** (point-cloud)\n` +

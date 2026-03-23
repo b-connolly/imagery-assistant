@@ -7,7 +7,7 @@ import {
   createLayerFromUrl,
   createLayerFromItemId,
   isElevationService,
-  addElevationLayerToGround,
+  handleElevationRouting,
 } from "../utils/layerFactory";
 import { searchAllItems, searchWebMaps, searchWebScenes, getPortalItemUrl } from "../utils/portalSearch";
 import { getCurrentView, getCurrentViewType, requestViewSwitch, requestWebMapSwitch, requestWebSceneSwitch } from "../utils/viewManager";
@@ -18,7 +18,8 @@ import {
   getAvailableRasterFunctions,
   type StretchType,
 } from "../utils/rasterFunctions";
-import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, findLayerByTitle , elapsed } from "../utils/agentHelpers";
+import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, findLayerByTitle, elapsed, AGENT_KEYWORDS } from "../utils/agentHelpers";
+import { withTimeout } from "../utils/safeFetch";
 
 // ── Extraction tool ──────────────────────────────────────────────────────────
 
@@ -188,7 +189,7 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
         if (target) {
           const title = target.title || "Untitled";
           if (typeof target.load === "function" && target.loadStatus !== "loaded") {
-            try { await target.load(); } catch { /* continue */ }
+            try { await withTimeout(target.load(), 30000, `Load "${target.title}"`); } catch { /* continue */ }
           }
           if (target.fullExtent) {
             await activeView.goTo(target.fullExtent, { duration: 2000 });
@@ -278,7 +279,7 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
 
       // Scoped content requests belong to ContentSearchAgent
       if (
-        /\b(my\s+content|my\s+org|living\s*atlas|arcgis\s*online)\b/i.test(text) ||
+        AGENT_KEYWORDS.scopedContent.test(text) ||
         /\b(search|find|browse|discover)\s+(for\s+)?(layers?|items?|content|data|services?)\b/i.test(text)
       ) {
         console.log("[LoadLayer] Skipping — scoped content search for ContentSearchAgent.");
@@ -286,48 +287,21 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
       }
 
       if (!hasDirectRef) {
-        // LayerInfoAgent keywords
-        if (/\b(describe|info|information|details|metadata|fields|attributes|schema|popup|properties|capabilities|statistics|stats|band\s*count|pixel\s*type|tell\s*me\s*about)\b/i.test(text)) {
-          console.log("[LoadLayer] Skipping — LayerInfoAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // MeasurementAgent keywords
-        if (/\b(measure|measurement|measuring|ruler|elevation\s*profile|cross[- ]?section|volume|cut\s*(?:and|&)?\s*fill|stockpile|excavat|earthwork|grading|how\s*far)\b/i.test(text)) {
-          console.log("[LoadLayer] Skipping — MeasurementAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // ImageryAnalysisAgent keywords
-        if (/\b(stretch|std\s*dev|standard\s*deviation|min[\s-]*max|percent[\s-]*clip|color\s*ramp|inferno|viridis|grayscale|ndvi|hillshade|slope|aspect|identify|popup|screenshot|raster\s*function|processing\s*template|render|visualize|color\s*ir|false\s*color)\b/i.test(text)) {
-          console.log("[LoadLayer] Skipping — ImageryAnalysisAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // PointCloudAgent keywords
-        if (/\b(class[\s_-]?code|classification|filter\s*(point|class|ground|vegetation|building|water)|color\s*by|point\s*size|point\s*density|points?\s*per\s*inch|return[\s_-]?number)\b/i.test(text) ||
-            (/\bfilter\b/i.test(text) && /\b(class|elevation|intensity|return|ground|vegetation|building|water|noise)\b/i.test(text))) {
-          console.log("[LoadLayer] Skipping — PointCloudAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // ElevationOffsetAgent keywords
-        if (/\b(fix|adjust|correct|offset|raise|lower|shift)\s*(the\s+)?(elevation|height|altitude|z[- ]?offset|vertical|floating|underground|mesh|layer)/i.test(text) ||
-            /\b(floating|underground|misaligned)\b/i.test(text)) {
-          console.log("[LoadLayer] Skipping — ElevationOffsetAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // SwipeAgent keywords
-        if (/\b(compare|swipe|split|side\s*by\s*side|versus|vs\.?)\b/i.test(text)) {
-          console.log("[LoadLayer] Skipping — SwipeAgent territory.");
-          return { outputMessage: "" };
-        }
-
-        // AllCapabilitiesAgent keywords
-        if (/\b(what\s*can\s*you\s*do|capabilities|help me|what\s*tools|what\s*agents)\b/i.test(text)) {
-          console.log("[LoadLayer] Skipping — AllCapabilitiesAgent territory.");
-          return { outputMessage: "" };
+        const bailoutChecks = [
+          { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
+          { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
+          { pattern: AGENT_KEYWORDS.imagery, label: "ImageryAnalysisAgent" },
+          { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
+          { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
+          { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
+          { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
+          { pattern: AGENT_KEYWORDS.capabilities, label: "AllCapabilitiesAgent" },
+        ];
+        for (const { pattern, label } of bailoutChecks) {
+          if (pattern.test(text)) {
+            console.log(`[LoadLayer] Skipping — ${label} territory.`);
+            return { outputMessage: "" };
+          }
         }
 
         // Generic catch-all: no URL/ID and no load verb, but has offset/analysis keywords
@@ -470,43 +444,11 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
       const isElevationLayer = layer.type === "elevation";
 
       if (isElevationLayer || (userWantsElevation && /^imagery/.test(layer.type))) {
-        // Switch to 3D for terrain surfaces — elevation only renders in SceneView
-        if (getCurrentViewType() !== "3d") {
-          try {
-            await requestViewSwitch("3d");
-            // Give the new SceneView a moment to fully initialize
-            await new Promise((r) => setTimeout(r, 1000));
-          } catch {
-            return {
-              outputMessage:
-                `"${displayName}" is an elevation surface and requires 3D. ` +
-                "Please switch to 3D using the toggle, then try again.",
-            };
-          }
-        }
-        const activeView = getCurrentView() as any;
-        if (!activeView?.map?.ground) {
-          return { outputMessage: "No active 3D scene view. Switch to 3D and try again." };
-        }
         const urlOrId = intent.serviceUrl ?? intent.itemId ?? "";
-        const elevLayer = addElevationLayerToGround(activeView, urlOrId, displayName);
-        await elevLayer.load();
-
-        // Zoom to the elevation layer's extent and tilt camera to show terrain
-        if (elevLayer.fullExtent) {
-          try {
-            await activeView.goTo(
-              { target: elevLayer.fullExtent, tilt: 65 } as any,
-              { duration: 2000 }
-            );
-          } catch { /* non-critical */ }
-        }
-
+        const result = await handleElevationRouting(urlOrId, displayName);
         const elapsedTime = elapsed(t0);
         return {
-          outputMessage:
-            `Added "${displayName}" as a terrain elevation surface in ${elapsedTime}s. ` +
-            "The elevation data is now applied to the scene's ground.",
+          outputMessage: `${result} (${elapsedTime}s)`,
         };
       }
 
@@ -533,7 +475,7 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
         activeView.map.layers.add(layer);
         console.log("[LoadLayer] Layer added, loading...");
 
-        await layer.load();
+        await withTimeout(layer.load(), 30000, `Load "${displayName}"`);
         console.log("[LoadLayer] Layer loaded. Type:", layer.type);
 
         if (layer.fullExtent) {

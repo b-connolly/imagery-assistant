@@ -1,19 +1,6 @@
-import Portal from "@arcgis/core/portal/Portal";
 import PortalQueryParams from "@arcgis/core/portal/PortalQueryParams";
 import type PortalItem from "@arcgis/core/portal/PortalItem";
-import { portalUrl } from "./arcgisAuth";
-
-// Cached portal instance — avoids re-creating and re-loading on every search
-let _portal: Portal | null = null;
-async function getPortal(): Promise<Portal> {
-  if (!_portal || _portal.url !== portalUrl) {
-    _portal = new Portal({ url: portalUrl });
-  }
-  if (_portal.loadStatus !== "loaded") {
-    await _portal.load();
-  }
-  return _portal;
-}
+import { getPortal } from "./arcgisAuth";
 
 export interface PortalSearchResult {
   itemId: string;

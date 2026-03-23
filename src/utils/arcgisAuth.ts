@@ -2,9 +2,28 @@ import OAuthInfo from "@arcgis/core/identity/OAuthInfo";
 import IdentityManager from "@arcgis/core/identity/IdentityManager";
 import Portal from "@arcgis/core/portal/Portal";
 import type Credential from "@arcgis/core/identity/Credential";
+import { safeFetch, safeFetchJson, withTimeout } from "./safeFetch";
 
 const portalUrl =
   import.meta.env.VITE_ARCGIS_PORTAL_URL || "https://www.arcgis.com";
+
+// ── Centralized Portal instance ──────────────────────────────────────────────
+
+let _cachedPortal: Portal | null = null;
+
+/**
+ * Get the shared, cached Portal instance. Loads on first call.
+ * All modules should use this instead of creating their own Portal instances.
+ */
+export async function getPortal(): Promise<Portal> {
+  if (!_cachedPortal || _cachedPortal.url !== portalUrl) {
+    _cachedPortal = new Portal({ url: portalUrl });
+  }
+  if (_cachedPortal.loadStatus !== "loaded") {
+    await withTimeout(_cachedPortal.load(), 30000, "Portal load");
+  }
+  return _cachedPortal;
+}
 
 /**
  * Register OAuth info with the IdentityManager.
@@ -56,9 +75,11 @@ export async function getPortalUser(): Promise<{
   thumbnailUrl: string | null;
   orgUrl: string;
 }> {
-  const portal = new Portal({ url: portalUrl });
-  await portal.load();
-  const user = portal.user!;
+  const portal = await getPortal();
+  if (!portal.user) {
+    throw new Error("Authentication failed: no portal user after login");
+  }
+  const user = portal.user;
   // Build org-specific URL: https://{urlKey}.{customBaseUrl}
   // e.g., urlKey="ivt" + customBaseUrl="maps.arcgis.com" → https://ivt.maps.arcgis.com
   const urlKey = (portal as any).urlKey;
@@ -84,6 +105,8 @@ export function signOut(): void {
 }
 
 const EMBEDDINGS_RESOURCE = "embeddings-v01.json";
+const DEFAULT_BASEMAP_ITEM_ID = "c11ce4f7801740b2905eb03ddc963ac8";
+const basemapItemId = import.meta.env.VITE_BASEMAP_ITEM_ID || DEFAULT_BASEMAP_ITEM_ID;
 
 /**
  * Ensure the embeddings resource exists on a WebMap portal item.
@@ -102,25 +125,24 @@ async function ensureEmbeddingsResource(
     `${portalUrl}/sharing/rest/content/items/${itemId}/resources/${EMBEDDINGS_RESOURCE}` +
     `?token=${encodeURIComponent(token)}`;
   try {
-    const resp = await fetch(resourceUrl);
-    if (resp.ok) {
-      const data = await resp.json();
-      // If it's a valid object with correct schema, we're good
-      if (data && data.schemaVersion === "0.1" && Array.isArray(data.layers)) {
-        return;
-      }
-      // Invalid format — delete and recreate
-      const removeForm = new FormData();
-      removeForm.append("f", "json");
-      removeForm.append("token", token);
-      removeForm.append("resource", EMBEDDINGS_RESOURCE);
-      await fetch(`${userItemBase}/removeResources`, {
-        method: "POST",
-        body: removeForm,
-      });
+    const resp = await safeFetch(resourceUrl);
+    const data = await resp.json();
+    // If it's a valid object with correct schema, we're good
+    if (data && data.schemaVersion === "0.1" && Array.isArray(data.layers)) {
+      return;
     }
-  } catch {
-    // Resource doesn't exist or can't be read — create it
+    // Invalid format — delete and recreate
+    const removeForm = new FormData();
+    removeForm.append("f", "json");
+    removeForm.append("token", token);
+    removeForm.append("resource", EMBEDDINGS_RESOURCE);
+    await safeFetch(`${userItemBase}/removeResources`, {
+      method: "POST",
+      body: removeForm,
+    });
+  } catch (err) {
+    // Resource doesn't exist or can't be read — continue to create it
+    console.warn("[Auth] Embeddings resource check failed, will recreate:", err);
   }
 
   // The arcgis-assistant orchestrator validates against this exact Zod schema
@@ -146,7 +168,7 @@ async function ensureEmbeddingsResource(
   addForm.append("fileName", EMBEDDINGS_RESOURCE);
   addForm.append("text", JSON.stringify(emptyEmbeddings));
 
-  await fetch(`${userItemBase}/addResources`, {
+  await safeFetchJson(`${userItemBase}/addResources`, {
     method: "POST",
     body: addForm,
   });
@@ -162,9 +184,11 @@ export async function ensureWebMapItem(): Promise<string> {
   const envItemId = import.meta.env.VITE_WEBMAP_ITEM_ID;
   if (envItemId) return envItemId;
 
-  const portal = new Portal({ url: portalUrl });
-  await portal.load();
-  const user = portal.user!;
+  const portal = await getPortal();
+  if (!portal.user) {
+    throw new Error("Cannot create WebMap item: no authenticated portal user");
+  }
+  const user = portal.user;
   const username = user.username ?? "";
 
   const credential = IdentityManager.findCredential(`${portalUrl}/sharing`);
@@ -176,9 +200,8 @@ export async function ensureWebMapItem(): Promise<string> {
     `&q=owner:${encodeURIComponent(username)} type:"Web Map" tags:"reality-data-assistant"` +
     `&num=1&sortField=modified&sortOrder=desc`;
 
-  const searchResp = await fetch(searchUrl);
-  const searchJson = await searchResp.json();
-  if (searchJson?.results?.length > 0) {
+  const searchJson = await safeFetchJson<{ results?: { id: string }[] }>(searchUrl);
+  if (searchJson?.results?.length && searchJson.results.length > 0) {
     const existingId = searchJson.results[0].id;
     // Ensure embeddings resource exists on the existing item
     await ensureEmbeddingsResource(existingId, username, token);
@@ -195,7 +218,7 @@ export async function ensureWebMapItem(): Promise<string> {
           layerType: "VectorTileLayer",
           title: "Dark Gray Canvas",
           styleUrl:
-            "https://www.arcgis.com/sharing/rest/content/items/c11ce4f7801740b2905eb03ddc963ac8/resources/styles/root.json",
+            `https://www.arcgis.com/sharing/rest/content/items/${basemapItemId}/resources/styles/root.json`,
         },
       ],
       title: "Dark Gray Canvas",
@@ -224,8 +247,10 @@ export async function ensureWebMapItem(): Promise<string> {
   formData.append("snippet", "Auto-created WebMap for Imagery Data Assistant");
   formData.append("text", JSON.stringify(webMapJson));
 
-  const resp = await fetch(addItemUrl, { method: "POST", body: formData });
-  const json = await resp.json();
+  const json = await safeFetchJson<{ success?: boolean; id?: string; error?: any }>(
+    addItemUrl,
+    { method: "POST", body: formData }
+  );
 
   if (!json?.success || !json?.id) {
     throw new Error(`Failed to create WebMap: ${JSON.stringify(json?.error ?? json)}`);
@@ -238,7 +263,7 @@ export async function ensureWebMapItem(): Promise<string> {
   shareForm.append("token", token);
   shareForm.append("everyone", "false");
   shareForm.append("org", "true");
-  await fetch(shareUrl, { method: "POST", body: shareForm });
+  await safeFetch(shareUrl, { method: "POST", body: shareForm });
 
   // Add empty embeddings resource (required by arcgis-assistant orchestrator)
   await ensureEmbeddingsResource(json.id, username, token);
