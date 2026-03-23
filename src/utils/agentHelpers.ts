@@ -59,6 +59,7 @@ export const AGENT_KEYWORDS = {
   elevationOffsetSimple: /\b(floating|underground|misaligned)\b/i,
   pointCloud: /\b(class[\s_-]?code|classification|filter\s*(point|class|ground|vegetation|building|water)|color\s*by\s*(elevation|intensity|class|rgb|return)|point\s*(?:cloud\s*)?size|point\s*(?:cloud\s*)?density|points?\s*per\s*inch|lidar|las\b|return[\s_-]?number|point\s*cloud\b|intensity\s*(modulat|modifi))/i,
   orientedImagery: /\b(oriented\s*imagery\s*viewer|oi\s*viewer|imagery\s*viewer|show\s*viewer|open\s*viewer|close\s*viewer|hide\s*viewer|coverage\s*footprint|image\s*gallery|navigation\s*tool|image\s*enhancement)\b/i,
+  catalogLayer: /\b(catalog\s*(filter|browse|query|panel|items?|types?)|filter\s*catalog|item[\s_]*type\s*filter|cd_itemtype|open\s*catalog|close\s*catalog|clear\s*catalog)\b/i,
   swipe: /\b(compare|swipe|split|side\s*by\s*side|versus|vs\.?)\b/i,
   capabilities: /\b(what\s*can\s*you\s*do|capabilities|help me|what\s*tools|what\s*agents)\b/i,
   search: /\b(search|find|browse|discover|look\s*up)\b/i,

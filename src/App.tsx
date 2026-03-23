@@ -28,6 +28,7 @@ import { registerSwipeAgent } from "./agents/SwipeAgent";
 import { registerLayerInfoAgent } from "./agents/LayerInfoAgent";
 import { registerPointCloudAgent } from "./agents/PointCloudAgent";
 import { registerOrientedImageryAgent } from "./agents/OrientedImageryAgent";
+import { registerCatalogLayerAgent } from "./agents/CatalogLayerAgent";
 
 // Global default — zoomed out to show the full world
 const DEFAULT_CENTER = [0, 20];
@@ -48,6 +49,7 @@ function registerCustomAgents(assistant: HTMLElement) {
   registerLayerInfoAgent(assistant);
   registerPointCloudAgent(assistant);
   registerOrientedImageryAgent(assistant);
+  registerCatalogLayerAgent(assistant);
 }
 
 export default function App() {

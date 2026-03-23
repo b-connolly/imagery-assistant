@@ -330,6 +330,7 @@ export function registerContentSearchAgent(assistant: HTMLElement) {
           { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
           { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
           { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
+          { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
           { pattern: AGENT_KEYWORDS.capabilities, label: "AllCapabilitiesAgent" },
         ];
         for (const { pattern, label } of bailoutChecks) {
