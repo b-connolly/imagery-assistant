@@ -346,6 +346,23 @@ export function registerLayerInfoAgent(assistant: HTMLElement) {
         return { outputMessage: "No map view is currently available." };
       }
 
+      // ── Quick layer order / list ──────────────────────────────────────
+      if (/\b(layer\s*order|draw\s*order|stacking|what\s*layers|list\s*layers|layers?\s*on\s*the\s*map)\b/i.test(text)) {
+        const layers = view.map.layers.toArray();
+        if (layers.length === 0) {
+          return { outputMessage: "No layers on the map." };
+        }
+        // #1 = bottom layer (first in array), highest number = top
+        const lines = layers.map((l: any, i: number) =>
+          `${i + 1}. ${l.title || "Untitled"} _(${l.type})_`
+        );
+        return {
+          outputMessage:
+            `**Layer order** (bottom → top):\n\n${lines.join("\n")}\n\n` +
+            `${layers.length} layer${layers.length > 1 ? "s" : ""} total.`,
+        };
+      }
+
       // ── Bail out: PointCloudAgent territory ──
       if (/\b(class[\s_-]?code|classification|color\s*by|point\s*size|point\s*density|points?\s*per\s*inch|return[\s_-]?number)\b/i.test(text) ||
           (/\bfilter\b/i.test(text) && /\b(class|elevation|intensity|return|ground|vegetation|building|water|noise)\b/i.test(text))) {
