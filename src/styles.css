@@ -492,3 +492,41 @@ arcgis-compass {
   gap: 12px;
   justify-content: center;
 }
+
+/* ── Oriented Imagery Viewer Panel ── */
+
+.oi-viewer-panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 500px;
+  height: 400px;
+  min-width: 300px;
+  min-height: 250px;
+  resize: both;
+  overflow: hidden;
+  z-index: 10;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  background: var(--calcite-color-background, #1e1e1e);
+  display: flex;
+  flex-direction: column;
+}
+
+.oi-viewer-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  cursor: move;
+  background: var(--calcite-color-foreground-2, #2b2b2b);
+  border-bottom: 1px solid var(--calcite-color-border-3, #444);
+  user-select: none;
+  font-size: 13px;
+  color: var(--calcite-color-text-1, #fff);
+}
+
+.oi-viewer-panel arcgis-oriented-imagery-viewer {
+  flex: 1;
+  width: 100%;
+}

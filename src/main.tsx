@@ -29,6 +29,7 @@ import "@arcgis/map-components/components/arcgis-elevation-profile";
 import "@arcgis/map-components/components/arcgis-volume-measurement";
 import "@arcgis/map-components/components/arcgis-swipe";
 import "@arcgis/map-components/components/arcgis-compass";
+import "@arcgis/map-components/components/arcgis-oriented-imagery-viewer";
 
 // ArcGIS AI Assistant registrations
 import "@arcgis/ai-components/components/arcgis-assistant";

@@ -27,6 +27,7 @@ import { registerMeasurementAgent } from "./agents/MeasurementAgent";
 import { registerSwipeAgent } from "./agents/SwipeAgent";
 import { registerLayerInfoAgent } from "./agents/LayerInfoAgent";
 import { registerPointCloudAgent } from "./agents/PointCloudAgent";
+import { registerOrientedImageryAgent } from "./agents/OrientedImageryAgent";
 
 // Global default — zoomed out to show the full world
 const DEFAULT_CENTER = [0, 20];
@@ -46,6 +47,7 @@ function registerCustomAgents(assistant: HTMLElement) {
   registerSwipeAgent(assistant);
   registerLayerInfoAgent(assistant);
   registerPointCloudAgent(assistant);
+  registerOrientedImageryAgent(assistant);
 }
 
 export default function App() {

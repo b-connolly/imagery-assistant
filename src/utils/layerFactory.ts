@@ -10,6 +10,7 @@ import PointCloudLayer from "@arcgis/core/layers/PointCloudLayer";
 import BuildingSceneLayer from "@arcgis/core/layers/BuildingSceneLayer";
 import VoxelLayer from "@arcgis/core/layers/VoxelLayer";
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer";
+import OrientedImageryLayer from "@arcgis/core/layers/OrientedImageryLayer";
 import CatalogLayer from "@arcgis/core/layers/CatalogLayer";
 import GroupLayer from "@arcgis/core/layers/GroupLayer";
 
@@ -153,11 +154,9 @@ export async function createLayerFromItemId(
         return layer;
       }
 
-      // Oriented Imagery Layer — load as FeatureLayer (point features) for popup support.
-      // OrientedImageryLayer loads as a group which doesn't support popups/identify.
-      if (keywordsLower.includes("orientedimagerylayer") && itemInfo.url) {
-        const featureUrl = itemInfo.url.replace(/\/?$/, "/0");
-        const layer = new FeatureLayer({ url: featureUrl });
+      // Oriented Imagery Layer — load as native OrientedImageryLayer for viewer support.
+      if (keywordsLower.includes("orientedimagerylayer")) {
+        const layer = new OrientedImageryLayer({ portalItem: { id: itemId } as any });
         if (title) layer.title = title;
         return layer;
       }

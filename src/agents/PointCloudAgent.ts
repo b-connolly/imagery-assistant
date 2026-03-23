@@ -13,7 +13,7 @@ import {
 type SymbologyMode = "class-code" | "elevation" | "intensity" | "rgb" | "return-number";
 
 interface PointCloudIntent {
-  action: "filter" | "symbology" | "point-size" | "density" | "reset" | "reset-filter" | "reset-symbology" | "info";
+  action: "filter" | "symbology" | "point-size" | "density" | "modulation" | "reset" | "reset-filter" | "reset-symbology" | "info";
   layerName: string | null;
   symbology: SymbologyMode | null;
   filterField: string | null;
@@ -67,10 +67,20 @@ function quickExtract(text: string): PointCloudIntent | null {
     return { action: "reset-symbology", layerName: null, symbology: null, ...noFilter, pointSize: null, density: null };
   }
 
+  // Intensity modulation: overlay intensity shading on current renderer
+  // Must be checked BEFORE symbology so "apply intensity modulation" doesn't become a full renderer swap
+  if (/\b(modulat|modification)\b/i.test(lower) && /\bintensity\b/i.test(lower)) {
+    return { action: "modulation", layerName: null, symbology: null, ...noFilter, pointSize: null, density: null };
+  }
+  // Toggle modulation on/off
+  if (/\b(toggle|enable|disable|turn\s*(on|off))\b/i.test(lower) && /\b(modulation|intensity\s*overlay)\b/i.test(lower)) {
+    return { action: "modulation", layerName: null, symbology: null, ...noFilter, pointSize: null, density: null };
+  }
+
   // Detect exclude intent: "hide class 1", "remove class 1", "all but class 1", "exclude class 1"
   const isExclude = /\b(hide|remove|exclude|without|except|all\s+but|everything\s+but|everything\s+except|show\s+all\s+but|show\s+all\s+except|filter\s+out)\b/i.test(text);
 
-  if (/\b(color|render|symbolog|symbol|show|display|style|visuali[sz]e)\b/i.test(lower)) {
+  if (/\b(color|render(?:ing)?|symbolog|symbol|show|display|style|visuali[sz]e|apply|change|set|use|switch\s*to)\b/i.test(lower)) {
     for (const [re, mode] of SYM_MAP) {
       if (re.test(text)) {
         return { action: "symbology", layerName: null, symbology: mode, ...noFilter, pointSize: null, density: null };
@@ -329,14 +339,14 @@ export function registerPointCloudAgent(assistant: HTMLElement) {
             else newSize = Math.max(1, Math.min(intent.pointSize!, 30));
 
             if (renderer) {
-              // Clone renderer to trigger reactivity
-              const cloned = renderer.clone();
-              cloned.pointSizeAlgorithm = {
+              renderer.pointSizeAlgorithm = {
                 type: "fixed-size",
                 useRealWorldSymbolSizes: false,
                 size: newSize,
               };
-              layer.renderer = cloned;
+              // Null-swap to force reactivity (clone() not implemented on PointCloudRenderer)
+              layer.renderer = null as any;
+              layer.renderer = renderer;
             }
             return { outputMessage: `Point size set to **${newSize}** for "${layer.title}".` };
           }
@@ -351,11 +361,34 @@ export function registerPointCloudAgent(assistant: HTMLElement) {
             else newDensity = Math.max(1, Math.min(intent.density!, 100));
 
             if (densRenderer) {
-              const cloned = densRenderer.clone();
-              cloned.pointsPerInch = newDensity;
-              layer.renderer = cloned;
+              densRenderer.pointsPerInch = newDensity;
+              layer.renderer = null as any;
+              layer.renderer = densRenderer;
             }
             return { outputMessage: `Point density set to **${newDensity} points/inch** for "${layer.title}".` };
+          }
+
+          case "modulation": {
+            // Toggle intensity modulation on/off on the current renderer.
+            // PointCloudRenderer.clone() is not implemented in SDK 5.x.
+            // Setting a property on the same object reference doesn't trigger reactivity,
+            // so we null-swap the renderer to force the SDK to re-render.
+            const modRenderer = layer.renderer as any;
+            if (!modRenderer) return { outputMessage: "No renderer on this layer to modulate." };
+            const wasEnabled = !!modRenderer.colorModulation?.field;
+            if (wasEnabled) {
+              modRenderer.colorModulation = null;
+            } else {
+              modRenderer.colorModulation = { field: "INTENSITY", minValue: 0, maxValue: 255 };
+            }
+            // Null-swap to force reactivity
+            layer.renderer = null as any;
+            layer.renderer = modRenderer;
+            return {
+              outputMessage: wasEnabled
+                ? `Intensity modulation **disabled** for "${layer.title}".`
+                : `Intensity modulation **enabled** for "${layer.title}". Points are now shaded by intensity on top of the current symbology.`,
+            };
           }
 
           case "reset-filter": {

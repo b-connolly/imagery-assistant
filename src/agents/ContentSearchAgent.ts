@@ -223,7 +223,12 @@ async function addMultipleResultsToMap(
       }
 
       let layer: any;
-      if (target.url) {
+      // Oriented Imagery layers must use createLayerFromItemId to get the correct
+      // OrientedImageryLayer type — fromArcGISServerUrl misdetects them as FeatureLayer.
+      // Check title, snippet, and type for any hint of oriented imagery.
+      const oiText = `${target.type} ${target.title} ${target.snippet ?? ""}`;
+      const isOI = /oriented\s*imagery/i.test(oiText);
+      if (target.url && !isOI) {
         layer = await createLayerFromUrl(target.url, target.title);
       } else {
         layer = await createLayerFromItemId(target.itemId, target.title);
@@ -247,18 +252,31 @@ async function addMultipleResultsToMap(
       view.map!.layers.add(layer);
       await withTimeout(layer.load(), 30000, `Load "${target.title}"`);
 
-      // Zoom to the layer — tilt camera for 3D content so it's visible.
-      // Some layers (e.g., OrientedImageryLayer, CatalogLayer) don't populate
-      // fullExtent until the layer view is ready, so fall back to whenLayerView.
+      // Zoom to the layer extent.
       try {
-        let zoomTarget: any = layer.fullExtent;
+        let zoomTarget: any = null;
+        // For queryable layers (Feature, OI sublayer, etc.), queryExtent gives the true data extent
+        const queryableLayer = typeof layer.queryExtent === "function"
+          ? layer
+          // Group layers (OrientedImageryLayer): find a queryable sublayer
+          : layer.layers?.toArray?.()?.find((sl: any) => typeof sl.queryExtent === "function") ?? null;
+        if (queryableLayer) {
+          try {
+            if (queryableLayer.loadStatus !== "loaded" && typeof queryableLayer.load === "function") {
+              await queryableLayer.load();
+            }
+            const result = await queryableLayer.queryExtent();
+            zoomTarget = result?.extent;
+          } catch { /* fall through */ }
+        }
+        // Fall back to fullExtent or layerView extent
+        if (!zoomTarget) zoomTarget = layer.fullExtent;
         if (!zoomTarget) {
           try {
             const lv = await view.whenLayerView(layer);
-            zoomTarget = lv?.fullExtent || layer.fullExtent || layer;
-          } catch {
-            zoomTarget = layer;
-          }
+            if (!lv?.fullExtent) await new Promise((r) => setTimeout(r, 500));
+            zoomTarget = lv?.fullExtent || layer.fullExtent;
+          } catch { /* continue */ }
         }
         const is3D = getCurrentViewType() === "3d";
         const goToParams = is3D && is3DItemType(target.type)
@@ -311,6 +329,7 @@ export function registerContentSearchAgent(assistant: HTMLElement) {
           { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
           { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
           { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
+          { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
           { pattern: AGENT_KEYWORDS.capabilities, label: "AllCapabilitiesAgent" },
         ];
         for (const { pattern, label } of bailoutChecks) {

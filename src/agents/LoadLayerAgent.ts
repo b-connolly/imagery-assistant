@@ -181,9 +181,15 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
 
         let target: any = stripped.length > 1 ? findLayerByTitle(allLayers, stripped) : null;
 
-        // If only one layer and no specific name, zoom to it
-        if (!target && allLayers.length === 1) {
-          target = allLayers[0];
+        // If no specific name matched, auto-select if there's only one operational layer
+        // (ignore ground/elevation placeholder GroupLayers)
+        if (!target) {
+          const operationalLayers = layers.filter(
+            (l: any) => l.type !== "group" || !l.title?.includes("(Elevation)")
+          );
+          if (operationalLayers.length === 1) {
+            target = operationalLayers[0];
+          }
         }
 
         if (target) {
@@ -191,8 +197,27 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
           if (typeof target.load === "function" && target.loadStatus !== "loaded") {
             try { await withTimeout(target.load(), 30000, `Load "${target.title}"`); } catch { /* continue */ }
           }
-          if (target.fullExtent) {
-            await activeView.goTo(target.fullExtent, { duration: 2000 });
+          let zoomExtent: any = null;
+          const qLayer = typeof target.queryExtent === "function"
+            ? target
+            : target.layers?.toArray?.()?.find((sl: any) => typeof sl.queryExtent === "function") ?? null;
+          if (qLayer) {
+            try {
+              if (qLayer.loadStatus !== "loaded" && typeof qLayer.load === "function") await qLayer.load();
+              const result = await qLayer.queryExtent();
+              zoomExtent = result?.extent;
+            } catch { /* fall through */ }
+          }
+          if (!zoomExtent) zoomExtent = target.fullExtent;
+          if (!zoomExtent) {
+            try {
+              const lv = await activeView.whenLayerView(target);
+              if (!lv?.fullExtent) await new Promise((r) => setTimeout(r, 500));
+              zoomExtent = lv?.fullExtent || target.fullExtent;
+            } catch { /* continue */ }
+          }
+          if (zoomExtent) {
+            await activeView.goTo(zoomExtent, { duration: 2000 });
             return { outputMessage: `Zoomed to "${title}".` };
           }
           return { outputMessage: `Layer "${title}" does not have a valid extent to zoom to.` };
@@ -295,6 +320,7 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
           { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
           { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
           { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
+          { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
           { pattern: AGENT_KEYWORDS.capabilities, label: "AllCapabilitiesAgent" },
         ];
         for (const { pattern, label } of bailoutChecks) {
@@ -478,8 +504,31 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
         await withTimeout(layer.load(), 30000, `Load "${displayName}"`);
         console.log("[LoadLayer] Layer loaded. Type:", layer.type);
 
-        if (layer.fullExtent) {
-          await activeView.goTo(layer.fullExtent, { duration: 2000 });
+        // Zoom to layer extent. For queryable layers, queryExtent returns the true data extent.
+        // Group layers (OrientedImageryLayer): find a queryable sublayer for extent.
+        let zoomTarget: any = null;
+        const queryableLayer = typeof layer.queryExtent === "function"
+          ? layer
+          : layer.layers?.toArray?.()?.find((sl: any) => typeof sl.queryExtent === "function") ?? null;
+        if (queryableLayer) {
+          try {
+            if (queryableLayer.loadStatus !== "loaded" && typeof queryableLayer.load === "function") {
+              await queryableLayer.load();
+            }
+            const result = await queryableLayer.queryExtent();
+            zoomTarget = result?.extent;
+          } catch { /* fall through */ }
+        }
+        if (!zoomTarget) zoomTarget = layer.fullExtent;
+        if (!zoomTarget) {
+          try {
+            const lv = await activeView.whenLayerView(layer);
+            if (!lv?.fullExtent) await new Promise((r) => setTimeout(r, 500));
+            zoomTarget = lv?.fullExtent || layer.fullExtent;
+          } catch { /* continue */ }
+        }
+        if (zoomTarget) {
+          await activeView.goTo(zoomTarget, { duration: 2000 });
         }
 
         const elapsedTime = elapsed(t0);
