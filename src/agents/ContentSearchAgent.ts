@@ -480,12 +480,12 @@ export function registerContentSearchAgent(assistant: HTMLElement) {
       // type filter match, keep it for exact matching (e.g., "add Alcatraz Island Gaussian Splat").
       let searchKeyword: string;
       if (matchedTypeFilter?.stripKeyword) {
-        // Check if there's a meaningful name left after stripping the type-filter pattern
-        const nameOnly = keyword.replace(matchedTypeFilter ? new RegExp(
-          Object.keys(matchedTypeFilter).length > 0 ? "\\b(gaussian\\s*splat|point\\s*cloud|integrated\\s*mesh|building|voxel|oriented\\s*imagery|catalog|web\\s*scene|web\\s*map|3d\\s*tiles?)\\b" : "$^", "gi"
-        ) : /$^/, "").trim();
-        if (addToMap && nameOnly.length > 2) {
-          searchKeyword = `title:"${nameOnly}"`;
+        // Strip the type-filter pattern from the keyword, keeping any remaining text (e.g., "Phoenix" from "web maps Phoenix")
+        const nameOnly = keyword.replace(
+          /\b(gaussian\s*splat|point\s*cloud|integrated\s*mesh|building|voxel|oriented\s*imagery|catalog|web\s*scenes?|web\s*maps?|3d\s*tiles?)\b/gi, ""
+        ).trim();
+        if (nameOnly.length > 1) {
+          searchKeyword = nameOnly;
         } else {
           searchKeyword = "*";
         }
