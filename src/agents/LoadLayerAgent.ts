@@ -87,6 +87,22 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
       const text = extractLastUserText(s);
       console.log("[LoadLayer] Starting. User text:", text);
 
+      // ── Switch 2D / 3D view ────────────────────────────────────────────
+      const switchTo3D = /\b(switch|change|toggle|go)\s*(to\s*)?(3d|scene|three\s*d)\b/i.test(text);
+      const switchTo2D = /\b(switch|change|toggle|go)\s*(to\s*)?(2d|map\s*view|two\s*d)\b/i.test(text);
+      if (switchTo3D || switchTo2D) {
+        const targetType = switchTo3D ? "3d" : "2d";
+        if (getCurrentViewType() === targetType) {
+          return { outputMessage: `Already in ${targetType.toUpperCase()} view.` };
+        }
+        try {
+          await requestViewSwitch(targetType);
+          return { outputMessage: `Switched to ${targetType.toUpperCase()} view.` };
+        } catch {
+          return { outputMessage: `Failed to switch to ${targetType.toUpperCase()}. Please use the 2D/3D toggle.` };
+        }
+      }
+
       // ── Remove / delete layer ──────────────────────────────────────────
       const removeMatch = text.match(
         /\b(?:remove|delete|drop|clear|hide|take\s+off|get\s+rid\s+of)\b/i
@@ -623,7 +639,8 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
       "OR when the user wants to zoom to, fly to, or focus on an existing layer's extent. " +
       "Can also load saved Web Maps and Web Scenes from portal by name " +
       "(e.g., 'Load Phoenix 2D Map', 'Open my 3D scene called Downtown'). " +
-      "Keywords: load, add, open, show, display, remove, delete, drop, clear, hide, zoom to, fly to, focus on, extent, web map, web scene, 2d map, 3d scene. " +
+      "Also handles switching between 2D map view and 3D scene view. " +
+      "Keywords: load, add, open, show, display, remove, delete, drop, clear, hide, zoom to, fly to, focus on, extent, web map, web scene, 2d map, 3d scene, switch to 3d, switch to 2d, toggle 3d, toggle 2d, change to scene, change to map. " +
       "Do NOT use for adjusting elevation, offset, stretch, or other properties of already-loaded layers.",
     createGraph,
   });

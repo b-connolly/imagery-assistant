@@ -113,16 +113,56 @@ export function extractLastUserText(state: any): string {
 // ── Layer matching ──────────────────────────────────────────────────────────
 
 /**
- * Find a layer by title using exact match first, then substring match.
- * Returns null if no match is found.
+ * Map of user-friendly type names to SDK runtime layer type strings.
+ * Allows users to refer to layers by type (e.g., "the gaussian splat layer").
+ */
+const LAYER_TYPE_ALIASES: Record<string, string[]> = {
+  "gaussian splat": ["gaussian-splat"],
+  "splat": ["gaussian-splat"],
+  "point cloud": ["point-cloud"],
+  "lidar": ["point-cloud"],
+  "imagery": ["imagery", "imagery-tile"],
+  "image": ["imagery", "imagery-tile"],
+  "feature": ["feature"],
+  "scene": ["scene"],
+  "integrated mesh": ["integrated-mesh", "integrated-mesh-3dtiles"],
+  "mesh": ["integrated-mesh", "integrated-mesh-3dtiles"],
+  "building": ["building-scene"],
+  "voxel": ["voxel"],
+  "oriented imagery": ["oriented-imagery"],
+  "elevation": ["elevation"],
+  "catalog": ["catalog"],
+};
+
+/**
+ * Find a layer by title or by type reference.
+ * Tries: exact title → substring title → type alias match.
+ * When only one layer of a referenced type exists, returns it directly.
  */
 export function findLayerByTitle(layers: any[], query: string): any | null {
   const q = query.toLowerCase();
-  return (
-    layers.find((l: any) => (l.title || "").toLowerCase() === q) ??
-    layers.find((l: any) => (l.title || "").toLowerCase().includes(q)) ??
-    null
-  );
+
+  // 1. Exact title match
+  const exact = layers.find((l: any) => (l.title || "").toLowerCase() === q);
+  if (exact) return exact;
+
+  // 2. Substring title match
+  const sub = layers.find((l: any) => (l.title || "").toLowerCase().includes(q));
+  if (sub) return sub;
+
+  // 3. Type alias match — "the gaussian splat layer" → find by layer.type
+  // Strip common filler words to isolate the type reference
+  const stripped = q.replace(/\b(the|layer|layers|my|this|that|current|loaded|active)\b/g, "").trim();
+  for (const [alias, types] of Object.entries(LAYER_TYPE_ALIASES)) {
+    if (stripped.includes(alias)) {
+      const matches = layers.filter((l: any) => types.includes(l.type));
+      if (matches.length === 1) return matches[0];
+      // If multiple, return the most recently added (last in array)
+      if (matches.length > 1) return matches[matches.length - 1];
+    }
+  }
+
+  return null;
 }
 
 // ── Agent state & registration ──────────────────────────────────────────────

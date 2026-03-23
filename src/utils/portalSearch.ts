@@ -128,8 +128,9 @@ const ALL_LAYER_TYPES = [
   "Scene Service",
   "Scene Layer",
   "3DTiles Service",
-  // Note: Oriented Imagery Layers are Feature Services with typeKeyword "OrientedImageryLayer"
-  // They do NOT have their own portal item type — searched via typeKeywords filter
+  // Oriented Imagery may be registered as "Feature Service" with typeKeyword
+  // "OrientedImageryLayer", or as the newer "Oriented Imagery Layer" portal type.
+  "Oriented Imagery Layer",
   // Feature & vector
   "Feature Service",
   "Feature Layer",
