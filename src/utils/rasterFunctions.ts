@@ -5,7 +5,6 @@ import MultipartColorRamp from "@arcgis/core/rest/support/MultipartColorRamp";
 import AlgorithmicColorRamp from "@arcgis/core/rest/support/AlgorithmicColorRamp";
 import Color from "@arcgis/core/Color";
 import * as rasterFunctionUtils from "@arcgis/core/layers/support/rasterFunctionUtils";
-import { safeFetch, appendToken } from "./safeFetch";
 
 // ── Stretch types ────────────────────────────────────────────────────────────
 
@@ -32,6 +31,12 @@ export function applyStretch(
   stretchType: StretchType,
   options: StretchOptions = {}
 ): void {
+  // SDK named ramps must be applied as a raster function, not on the renderer
+  if (options.colorRampName && !isCustomRamp(options.colorRampName)) {
+    applySDKColorRamp(layer, options.colorRampName);
+    return;
+  }
+
   const opts: any = {
     stretchType,
     numberOfStandardDeviations: options.stdDevs ?? 2,
@@ -84,17 +89,35 @@ function stopsToRamp(stops: number[][]): MultipartColorRamp {
   return new MultipartColorRamp({ colorRamps: ramps });
 }
 
+/** Custom ramp names that we build from hardcoded color stops. */
+const CUSTOM_RAMPS: Record<string, number[][]> = {
+  inferno: INFERNO_STOPS,
+  viridis: VIRIDIS_STOPS,
+  grayscale: [[0, 0, 0], [255, 255, 255]],
+};
+
 /**
- * Get a color ramp by name. Supports custom names (inferno, viridis)
- * and SDK ramp names via colormapByRampName.
+ * Get a color ramp by name. Supports custom names (inferno, viridis, grayscale).
+ * Returns null for SDK named ramps — those must be applied via applySDKColorRamp().
  */
 export function getColorRampByName(name: string): MultipartColorRamp | null {
-  switch (name.toLowerCase()) {
-    case "inferno": return stopsToRamp(INFERNO_STOPS);
-    case "viridis": return stopsToRamp(VIRIDIS_STOPS);
-    case "grayscale": return stopsToRamp([[0, 0, 0], [255, 255, 255]]);
-    default: return null; // SDK ramp names handled via renderer colorRamp property
-  }
+  const stops = CUSTOM_RAMPS[name.toLowerCase()];
+  return stops ? stopsToRamp(stops) : null;
+}
+
+/** Whether a ramp name is a custom ramp (can be set on renderer.colorRamp). */
+export function isCustomRamp(name: string): boolean {
+  return name.toLowerCase() in CUSTOM_RAMPS;
+}
+
+/**
+ * Apply an SDK named color ramp via rasterFunctionUtils.colormap as a raster function.
+ * This is the official SDK way to apply named ramps like "prediction", "elevation1", etc.
+ */
+export function applySDKColorRamp(layer: ImageryLayer, rampName: string): void {
+  layer.rasterFunction = rasterFunctionUtils.colormap({ colorRampName: rampName as any });
+  layer.renderer = null as any; // Clear custom renderer so the colormap is visible
+  layer.refresh();
 }
 
 /** All SDK-supported color ramp names. */
@@ -118,6 +141,11 @@ export function applyColorRamp(
   stretchType: StretchType = "standard-deviation",
   stdDevs: number = 2
 ): void {
+  // SDK named ramps go through colormap raster function
+  if (!isCustomRamp(rampName)) {
+    applySDKColorRamp(layer, rampName);
+    return;
+  }
   applyStretch(layer, stretchType, { stdDevs, colorRampName: rampName });
 }
 
@@ -338,34 +366,41 @@ export async function identifyPixel(
   try {
     if (!layer.url) return null;
 
-    const geometry = JSON.stringify({
-      x: point.x,
-      y: point.y,
-      spatialReference: point.spatialReference?.toJSON?.() ?? point.spatialReference,
+    // Use the SDK's built-in identify — handles auth, mosaic rules, and projections automatically
+    const ImageIdentifyParameters = (await import("@arcgis/core/rest/support/ImageIdentifyParameters")).default;
+
+    const params = new ImageIdentifyParameters({
+      geometry: point,
+      returnGeometry: false,
+      returnCatalogItems: false,
+      returnPixelValues: true,
     });
 
-    const params = new URLSearchParams({
-      geometry,
-      geometryType: "esriGeometryPoint",
-      returnGeometry: "false",
-      returnCatalogItems: "false",
-      f: "json",
-    });
-
-    if (layer.rasterFunction) {
-      params.set("renderingRule", JSON.stringify(layer.rasterFunction.toJSON()));
+    // Include the current mosaic rule so the correct image is identified
+    if ((layer as any).mosaicRule) {
+      params.mosaicRule = (layer as any).mosaicRule;
     }
 
-    const identifyUrl = appendToken(`${layer.url}/identify?${params}`);
-    const resp = await safeFetch(identifyUrl);
-    const data = await resp.json();
+    // Include the current rendering rule so processed values are returned
+    if (layer.rasterFunction) {
+      (params as any).renderingRule = layer.rasterFunction;
+    }
 
-    if (!data || data.value === undefined || data.value === "NoData") return null;
+    const result = await (layer as any).identify(params);
+    console.log("[identifyPixel] SDK result:", result);
+
+    if (!result) return null;
+
+    // Extract pixel values from the result
+    const pixelValue = result.value;
+    if (pixelValue === undefined || pixelValue === null || pixelValue === "NoData") return null;
 
     const values =
-      typeof data.value === "string"
-        ? data.value.split(", ").map(Number).filter((v: number) => !isNaN(v))
-        : [Number(data.value)];
+      typeof pixelValue === "string"
+        ? pixelValue.split(", ").map(Number).filter((v: number) => !isNaN(v))
+        : Array.isArray(pixelValue)
+          ? pixelValue.map(Number).filter((v: number) => !isNaN(v))
+          : [Number(pixelValue)];
 
     if (values.length === 0) return null;
 
