@@ -1,6 +1,6 @@
 import { StateGraph, START, END } from "@langchain/langgraph/web";
-import { getCurrentView, getCurrentViewType, onViewChange, requestViewSwitch } from "../utils/viewManager";
-import { extractLastUserText, createAgentState, registerAgentElement , elapsed } from "../utils/agentHelpers";
+import { getCurrentView, getCurrentViewType, onViewChange, requestViewSwitch } from "../../utils/viewManager";
+import { extractLastUserText, createAgentState, registerAgentElement , elapsed } from "../../utils/agentHelpers";
 import Collection from "@arcgis/core/core/Collection";
 import ElevationProfileLineGround from "@arcgis/core/analysis/ElevationProfile/ElevationProfileLineGround";
 import ElevationProfileLineScene from "@arcgis/core/analysis/ElevationProfile/ElevationProfileLineScene";

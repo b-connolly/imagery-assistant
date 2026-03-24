@@ -19,16 +19,19 @@ import {
   type ViewType,
 } from "./utils/viewManager";
 import ViewToggle from "./components/ViewToggle";
-import { registerLoadLayerAgent } from "./agents/LoadLayerAgent";
-import { registerImageryToolsAgent } from "./agents/ImageryToolsAgent";
-import { registerElevationOffsetAgent } from "./agents/ElevationOffsetAgent";
-import { registerContentSearchAgent } from "./agents/ContentSearchAgent";
-import { registerMeasurementAgent } from "./agents/MeasurementAgent";
-import { registerSwipeAgent } from "./agents/SwipeAgent";
-import { registerLayerInfoAgent } from "./agents/LayerInfoAgent";
-import { registerPointCloudAgent } from "./agents/PointCloudAgent";
-import { registerOrientedImageryAgent } from "./agents/OrientedImageryAgent";
-import { registerCatalogLayerAgent } from "./agents/CatalogLayerAgent";
+// discovery
+import { registerContentSearchAgent } from "./agents/discovery/ContentSearchAgent";
+import { registerLoadLayerAgent } from "./agents/discovery/LoadLayerAgent";
+// visualization
+import { registerImageryToolsAgent } from "./agents/visualization/ImageryToolsAgent";
+import { registerPointCloudAgent } from "./agents/visualization/PointCloudAgent";
+import { registerOrientedImageryAgent } from "./agents/visualization/OrientedImageryAgent";
+import { registerCatalogLayerAgent } from "./agents/visualization/CatalogLayerAgent";
+// analysis
+import { registerSwipeAgent } from "./agents/analysis/SwipeAgent";
+import { registerLayerInfoAgent } from "./agents/analysis/LayerInfoAgent";
+import { registerMeasurementAgent } from "./agents/analysis/MeasurementAgent";
+import { registerElevationOffsetAgent } from "./agents/analysis/ElevationOffsetAgent";
 
 // Global default — zoomed out to show the full world
 const DEFAULT_CENTER = [0, 20];

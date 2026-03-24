@@ -7,18 +7,18 @@ import {
   createLayerFromUrl,
   createLayerFromItemId,
   handleElevationRouting,
-} from "../utils/layerFactory";
-import { searchAllItems, searchWebMaps, searchWebScenes, getPortalItemUrl } from "../utils/portalSearch";
-import { getCurrentView, getCurrentViewType, requestViewSwitch, requestWebMapSwitch, requestWebSceneSwitch } from "../utils/viewManager";
+} from "../../utils/layerFactory";
+import { searchAllItems, searchWebMaps, searchWebScenes, getPortalItemUrl } from "../../utils/portalSearch";
+import { getCurrentView, getCurrentViewType, requestViewSwitch, requestWebMapSwitch, requestWebSceneSwitch } from "../../utils/viewManager";
 import ImageryLayer from "@arcgis/core/layers/ImageryLayer";
 import {
   applyStretch,
   applyServerTemplate,
   getServerTemplates,
   type StretchType,
-} from "../utils/rasterFunctions";
-import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, findLayerByTitle, elapsed, AGENT_KEYWORDS } from "../utils/agentHelpers";
-import { withTimeout } from "../utils/safeFetch";
+} from "../../utils/rasterFunctions";
+import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, findLayerByTitle, elapsed, AGENT_KEYWORDS } from "../../utils/agentHelpers";
+import { withTimeout } from "../../utils/safeFetch";
 
 // ── Extraction tool ──────────────────────────────────────────────────────────
 

@@ -4,11 +4,11 @@ import {
   type SearchScope,
   type ScopedSearchResults,
   type PortalSearchResult,
-} from "../utils/portalSearch";
-import { createLayerFromUrl, createLayerFromItemId, isElevationService, handleElevationRouting } from "../utils/layerFactory";
-import { getCurrentView, getCurrentViewType, requestViewSwitch, requestWebMapSwitch, requestWebSceneSwitch, onViewChange } from "../utils/viewManager";
-import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, elapsed, is3DItemType, AGENT_KEYWORDS } from "../utils/agentHelpers";
-import { withTimeout } from "../utils/safeFetch";
+} from "../../utils/portalSearch";
+import { createLayerFromUrl, createLayerFromItemId, isElevationService, handleElevationRouting } from "../../utils/layerFactory";
+import { getCurrentView, getCurrentViewType, requestViewSwitch, requestWebMapSwitch, requestWebSceneSwitch, onViewChange } from "../../utils/viewManager";
+import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, elapsed, is3DItemType, AGENT_KEYWORDS } from "../../utils/agentHelpers";
+import { withTimeout } from "../../utils/safeFetch";
 
 // ── Cached search results for "add result N" follow-ups ──────────────────────
 let lastSearchResults: ScopedSearchResults[] = [];

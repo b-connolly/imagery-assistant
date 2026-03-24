@@ -1,5 +1,5 @@
 import { StateGraph, START, END } from "@langchain/langgraph/web";
-import { getCurrentView, getMapSceneElement, onViewChange } from "../utils/viewManager";
+import { getCurrentView, getMapSceneElement, onViewChange } from "../../utils/viewManager";
 import {
   extractLastUserText,
   createAgentState,
@@ -7,7 +7,7 @@ import {
   findLayerByTitle,
   elapsed,
   AGENT_KEYWORDS,
-} from "../utils/agentHelpers";
+} from "../../utils/agentHelpers";
 
 // ── Active viewer tracking ──────────────────────────────────────────────────
 

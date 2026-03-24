@@ -5,9 +5,9 @@ import {
   registerAgentElement,
   findLayerByTitle,
   elapsed,
-} from "../utils/agentHelpers";
-import { getCurrentView } from "../utils/viewManager";
-import { withTimeout } from "../utils/safeFetch";
+} from "../../utils/agentHelpers";
+import { getCurrentView } from "../../utils/viewManager";
+import { withTimeout } from "../../utils/safeFetch";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -418,7 +418,7 @@ export function registerLayerInfoAgent(assistant: HTMLElement) {
           // For imagery layers, enable click-to-identify pixel values directly
           const imgView = getCurrentView() as any;
           if (imgView) {
-            const { identifyPixel } = await import("../utils/rasterFunctions");
+            const { identifyPixel } = await import("../../utils/rasterFunctions");
             // Remove any existing click handler
             if ((window as any).__imgIdentifyRemove) {
               (window as any).__imgIdentifyRemove();

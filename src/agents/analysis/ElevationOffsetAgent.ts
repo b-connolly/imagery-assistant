@@ -3,9 +3,9 @@ import { invokeToolPrompt } from "@arcgis/ai-orchestrator";
 import { HumanMessage } from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { getCurrentView, getCurrentViewType, requestViewSwitch, getOperationalLayers, onViewChange } from "../utils/viewManager";
-import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, findLayerByTitle , elapsed } from "../utils/agentHelpers";
-import { withTimeout } from "../utils/safeFetch";
+import { getCurrentView, getCurrentViewType, requestViewSwitch, getOperationalLayers, onViewChange } from "../../utils/viewManager";
+import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, findLayerByTitle , elapsed } from "../../utils/agentHelpers";
+import { withTimeout } from "../../utils/safeFetch";
 
 // ── Extraction tool ──────────────────────────────────────────────────────────
 

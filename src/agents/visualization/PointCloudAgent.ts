@@ -1,12 +1,12 @@
 import { StateGraph, START, END } from "@langchain/langgraph/web";
-import { getCurrentView, getCurrentViewType } from "../utils/viewManager";
+import { getCurrentView, getCurrentViewType } from "../../utils/viewManager";
 import {
   extractLastUserText,
   createAgentState,
   registerAgentElement,
   findLayerByTitle,
   elapsed,
-} from "../utils/agentHelpers";
+} from "../../utils/agentHelpers";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

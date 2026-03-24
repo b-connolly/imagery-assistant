@@ -1,13 +1,13 @@
 import { StateGraph, START, END } from "@langchain/langgraph/web";
 import ImageryLayer from "@arcgis/core/layers/ImageryLayer";
-import { getCurrentView, onViewChange } from "../utils/viewManager";
+import { getCurrentView, onViewChange } from "../../utils/viewManager";
 import {
   extractLastUserText,
   createAgentState,
   registerAgentElement,
   findLayerByTitle,
   AGENT_KEYWORDS,
-} from "../utils/agentHelpers";
+} from "../../utils/agentHelpers";
 import {
   applyStretch,
   applyServerTemplate,
@@ -17,7 +17,7 @@ import {
   getBandInfos,
   SDK_COLOR_RAMPS,
   type StretchType,
-} from "../utils/rasterFunctions";
+} from "../../utils/rasterFunctions";
 
 // ── Active click handler tracking ────────────────────────────────────────────
 

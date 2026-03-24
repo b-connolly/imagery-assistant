@@ -267,9 +267,14 @@ without writing code or navigating complex menus.
 <ul>
   <li><strong>Content Search &amp; Discovery</strong> &mdash; Search My Content, My Org, ArcGIS Online, or Living Atlas for layers by keyword</li>
   <li><strong>Layer Loading</strong> &mdash; Load any ArcGIS-supported layer type from a URL, item ID, or keyword search</li>
-  <li><strong>Imagery Analysis</strong> &mdash; Apply stretches, color ramps, NDVI, hillshade, slope, and server-side raster functions</li>
+  <li><strong>Imagery Tools</strong> &mdash; Apply stretches, color ramps, server-side processing templates, and identify pixel values</li>
+  <li><strong>Layer Comparison</strong> &mdash; Swipe between two layers to compare them side by side</li>
+  <li><strong>Point Cloud Visualization</strong> &mdash; Filter LiDAR by classification, color by elevation/intensity/RGB</li>
   <li><strong>Measurement Tools</strong> &mdash; Distance, area, and elevation profile with configurable units</li>
-  <li><strong>3D Elevation Offset</strong> &mdash; Auto-fix or manually adjust floating/underground 3D layers</li>
+  <li><strong>3D Elevation Offset</strong> &mdash; Auto-fix, click-to-fix, calculate, or manually adjust floating/underground 3D layers</li>
+  <li><strong>Oriented Imagery</strong> &mdash; View street-level and oblique imagery with coverage footprints</li>
+  <li><strong>Catalog Layers</strong> &mdash; Browse and filter items in catalog layer collections</li>
+  <li><strong>Layer Info</strong> &mdash; Inspect metadata, fields, statistics, and layer order</li>
   <li><strong>Navigation &amp; Help</strong> &mdash; Zoom to locations, change basemaps, get contextual help</li>
 </ul>
 
@@ -291,10 +296,10 @@ without writing code or navigating complex menus.
 <span class="dim">│</span>                              │           ▼                          │ <span class="dim">│</span>
 <span class="dim">│</span>  <span class="highlight">Agents</span>                      │  ┌────────────────────────────────┐ │ <span class="dim">│</span>
 <span class="dim">│</span>  ┌──────────────────────┐   │  │ <span class="green">Content Search</span>  │ <span class="green">Load Layer</span>  │ │ <span class="dim">│</span>
-<span class="dim">│</span>  │ Built-in:            │   │  │ <span class="green">Imagery Analysis</span>│ <span class="green">Measurement</span> │ │ <span class="dim">│</span>
-<span class="dim">│</span>  │  • Help               │   │  │ <span class="green">Elev. Offset</span>   │ <span class="green">Capabilities</span>│ │ <span class="dim">│</span>
-<span class="dim">│</span>  │  • Navigation         │   │  │ <span class="green">Help Agent</span>     │ <span class="green">Navigation</span>  │ │ <span class="dim">│</span>
-<span class="dim">│</span>  │  • Data Exploration   │   │  │ <span class="green">Data Exploration</span>│             │ │ <span class="dim">│</span>
+<span class="dim">│</span>  │ Built-in:            │   │  │ <span class="green">Imagery Tools</span>  │ <span class="green">Measurement</span> │ │ <span class="dim">│</span>
+<span class="dim">│</span>  │  • Help               │   │  │ <span class="green">Elev. Offset</span>   │ <span class="green">Swipe</span>       │ │ <span class="dim">│</span>
+<span class="dim">│</span>  │  • Navigation         │   │  │ <span class="green">Point Cloud</span>    │ <span class="green">Layer Info</span>  │ │ <span class="dim">│</span>
+<span class="dim">│</span>  │  • Data Exploration   │   │  │ <span class="green">Oriented Img</span>   │ <span class="green">Catalog Lyr</span> │ │ <span class="dim">│</span>
 <span class="dim">│</span>  └──────────────────────┘   │  └────────────────────────────────┘ │ <span class="dim">│</span>
 <span class="dim">│</span>                              └──────────────────────────────────────┘ <span class="dim">│</span>
 <span class="dim">│</span>                                                                     <span class="dim">│</span>
@@ -356,7 +361,7 @@ without writing code or navigating complex menus.
 <!-- ════════════════════════════════════════════════ AGENTS -->
 <h2 id="agents" class="page-break">4. Agent Capabilities</h2>
 
-<p>The assistant includes <strong>9 agents</strong> &mdash; 3 built-in ArcGIS agents and 6 custom agents.
+<p>The assistant includes <strong>13 agents</strong> &mdash; 3 built-in ArcGIS agents and 10 custom agents.
 The AI orchestrator selects the best agent for each user request based on the agent descriptions.</p>
 
 <!-- Built-in Agents -->
@@ -427,27 +432,26 @@ The AI orchestrator selects the best agent for each user request based on the ag
 </div>
 
 <div class="agent-card page-break">
-  <h3>Imagery Analysis Agent <span class="badge custom">Custom</span></h3>
-  <p>Analyzes and visualizes imagery layers already loaded on the map using renderers, raster functions,
-  and interactive tools.</p>
+  <h3>Imagery Tools Agent <span class="badge custom">Custom</span></h3>
+  <p>Visualizes and analyzes imagery layers on the map via chat commands &mdash; stretches, color ramps,
+  server-side processing templates, and pixel identification.</p>
   <h4>Capabilities</h4>
   <table>
     <tr><th>Category</th><th>Options</th></tr>
-    <tr><td>Stretch Renderers</td><td>Standard Deviation, Min-Max, Percent Clip</td></tr>
-    <tr><td>Color Ramps</td><td>Inferno, Viridis, Grayscale</td></tr>
-    <tr><td>Raster Functions</td><td>NDVI, Hillshade, Slope, Aspect, Color Infrared (False Color)</td></tr>
-    <tr><td>Server-side Functions</td><td>Automatically discovers and applies server processing templates</td></tr>
-    <tr><td>Interactive Tools</td><td>Click-to-identify pixel popup, center pixel identification</td></tr>
-    <tr><td>Export</td><td>Screenshot capture (PNG)</td></tr>
+    <tr><td>Stretch Renderers</td><td>Standard Deviation, Min-Max, Percent Clip, Histogram Equalization, Sigmoid</td></tr>
+    <tr><td>Color Ramps</td><td>Inferno, Viridis, Grayscale, plus all SDK named ramps (Elevation, Prediction, etc.)</td></tr>
+    <tr><td>Server Templates</td><td>Auto-discovers and applies server-side processing templates by name</td></tr>
+    <tr><td>Pixel Identify</td><td>Click-to-identify popup shows band values at any pixel; supports mosaic rules</td></tr>
+    <tr><td>Reset</td><td>Clear all raster functions and renderers to restore original rendering</td></tr>
   </table>
   <h4>Example Prompts</h4>
   <ul>
     <li><span class="prompt">apply standard deviation stretch</span></li>
     <li><span class="prompt">render with inferno color ramp</span></li>
-    <li><span class="prompt">apply NDVI</span></li>
-    <li><span class="prompt">show pixel values at center</span></li>
-    <li><span class="prompt">list available raster functions</span></li>
-    <li><span class="prompt">take a screenshot</span></li>
+    <li><span class="prompt">apply the hillshade template</span></li>
+    <li><span class="prompt">identify pixels on click</span></li>
+    <li><span class="prompt">list processing templates</span></li>
+    <li><span class="prompt">clear raster function</span></li>
   </ul>
 </div>
 
@@ -482,28 +486,105 @@ The AI orchestrator selects the best agent for each user request based on the ag
   elevation offset. Supports automatic terrain-based correction and manual adjustments.</p>
   <h4>Modes</h4>
   <ul>
-    <li><strong>Auto-fix</strong> &mdash; Samples terrain elevation at a 5&times;5 grid across the layer extent,
-    calculates the optimal offset, and applies it automatically</li>
+    <li><strong>Auto-fix</strong> &mdash; Samples terrain at a 5&times;5 grid, uses hitTest to detect the layer surface,
+    and computes the exact delta to snap the layer to the ground</li>
+    <li><strong>Click-to-fix</strong> &mdash; Click directly on the 3D layer to snap it to terrain at that point;
+    uses hitTest to measure the gap between layer surface and ground</li>
+    <li><strong>Calculate Offset</strong> &mdash; Diagnostic mode that measures the gap without applying changes;
+    reports how far above or below the ground the layer is</li>
     <li><strong>Manual Set</strong> &mdash; Sets an absolute offset value (e.g., <span class="prompt">set offset to 50 meters</span>)</li>
     <li><strong>Relative Adjust</strong> &mdash; Adds or subtracts from current offset (e.g., <span class="prompt">raise by 10m</span>)</li>
-    <li><strong>Check</strong> &mdash; Reports current offset and Z-range without making changes</li>
+    <li><strong>Check</strong> &mdash; Reports current elevation info and Z-range without making changes</li>
   </ul>
   <h4>Supported 3D Layer Types</h4>
   <p>Integrated Mesh, Scene Layer, Point Cloud, Building Scene Layer, Gaussian Splat, 3D Tiles</p>
   <h4>Example Prompts</h4>
   <ul>
     <li><span class="prompt">fix the floating mesh</span></li>
-    <li><span class="prompt">align this layer to the ground</span></li>
-    <li><span class="prompt">add 16 meters to the layer</span></li>
+    <li><span class="prompt">fix elevation by clicking</span></li>
+    <li><span class="prompt">calculate offset</span></li>
+    <li><span class="prompt">raise by 2 meters</span></li>
     <li><span class="prompt">lower the mesh by 20 feet</span></li>
   </ul>
 </div>
 
 <div class="agent-card">
-  <h3>All Capabilities Agent <span class="badge custom">Custom</span></h3>
-  <p>Meta-agent that lists all available assistant capabilities. Dynamically discovers all registered
-  agents (both built-in and custom) and formats a human-readable summary. Triggered by prompts
-  like <span class="prompt">what can you do?</span> or <span class="prompt">list capabilities</span>.</p>
+  <h3>Swipe / Compare Agent <span class="badge custom">Custom</span></h3>
+  <p>Activates a swipe tool to visually compare two layers side by side on the map.
+  Drag a handle across the map to reveal one layer on each side.</p>
+  <h4>Features</h4>
+  <ul>
+    <li>Horizontal (left/right) and vertical (top/bottom) swipe directions</li>
+    <li>Accepts layer names or numeric references (e.g., <span class="prompt">compare layer 1 and layer 3</span>)</li>
+    <li>Swipe position defaults to center; can be customized</li>
+  </ul>
+  <h4>Example Prompts</h4>
+  <ul>
+    <li><span class="prompt">compare the two imagery layers</span></li>
+    <li><span class="prompt">swipe between NAIP and Sentinel</span></li>
+    <li><span class="prompt">clear swipe</span></li>
+  </ul>
+</div>
+
+<div class="agent-card">
+  <h3>Point Cloud Agent <span class="badge custom">Custom</span></h3>
+  <p>Controls point cloud layer visualization &mdash; classification filtering, color modes,
+  point sizing, and density for LiDAR data.</p>
+  <h4>Capabilities</h4>
+  <ul>
+    <li><strong>Classification Filter</strong> &mdash; Show/hide by class code (ground, vegetation, buildings, water, etc.)</li>
+    <li><strong>Color By</strong> &mdash; Elevation, intensity, classification, RGB, or return number</li>
+    <li><strong>Point Size &amp; Density</strong> &mdash; Adjust visual point size and points-per-inch</li>
+  </ul>
+  <h4>Example Prompts</h4>
+  <ul>
+    <li><span class="prompt">show only ground and buildings</span></li>
+    <li><span class="prompt">color by elevation</span></li>
+    <li><span class="prompt">increase point size</span></li>
+  </ul>
+</div>
+
+<div class="agent-card">
+  <h3>Oriented Imagery Agent <span class="badge custom">Custom</span></h3>
+  <p>Opens the ArcGIS Oriented Imagery viewer for street-level, oblique, or drone imagery layers.
+  Supports coverage footprints, image galleries, and navigation tools.</p>
+  <h4>Example Prompts</h4>
+  <ul>
+    <li><span class="prompt">open oriented imagery viewer</span></li>
+    <li><span class="prompt">show coverage footprints</span></li>
+    <li><span class="prompt">close viewer</span></li>
+  </ul>
+</div>
+
+<div class="agent-card">
+  <h3>Catalog Layer Agent <span class="badge custom">Custom</span></h3>
+  <p>Manages Catalog Layers (dynamic collections of items organized by geography). Provides an
+  interactive filter panel for browsing items by type within the catalog.</p>
+  <h4>Example Prompts</h4>
+  <ul>
+    <li><span class="prompt">show the catalog filter panel</span></li>
+    <li><span class="prompt">filter catalog by imagery</span></li>
+  </ul>
+</div>
+
+<div class="agent-card">
+  <h3>Layer Info Agent <span class="badge custom">Custom</span></h3>
+  <p>Queries layers for detailed metadata, fields, attributes, popup configuration, capabilities,
+  spatial reference, processing templates, and raster statistics.</p>
+  <h4>Features</h4>
+  <ul>
+    <li>Supports numeric references: <span class="prompt">describe layer 4</span></li>
+    <li>Lists layer order / draw order</li>
+    <li>Computes raster statistics (min, max, mean, std dev) for imagery and elevation layers</li>
+    <li>Reports sublayers, tables, band count, pixel type, and spatial reference</li>
+  </ul>
+  <h4>Example Prompts</h4>
+  <ul>
+    <li><span class="prompt">describe the imagery layer</span></li>
+    <li><span class="prompt">what is the layer order?</span></li>
+    <li><span class="prompt">show fields for layer 2</span></li>
+    <li><span class="prompt">what are the raster statistics?</span></li>
+  </ul>
 </div>
 
 <!-- ════════════════════════════════════════════════ WORKFLOWS -->
@@ -519,13 +600,13 @@ The AI orchestrator selects the best agent for each user request based on the ag
       <li><span class="prompt">add result 1</span>
         <br><em>The layer is loaded onto the map and the view zooms to its extent.</em></li>
       <li><span class="prompt">apply standard deviation stretch</span>
-        <br><em>Imagery Analysis Agent enhances the contrast for better visualization.</em></li>
+        <br><em>Imagery Tools Agent enhances the contrast for better visualization.</em></li>
       <li><span class="prompt">render with inferno color ramp</span>
         <br><em>A heat-style color ramp is applied to highlight temperature differences.</em></li>
-      <li><span class="prompt">enable click-to-identify popup</span>
+      <li><span class="prompt">identify pixels on click</span>
         <br><em>Clicking anywhere on the imagery now shows pixel/band values.</em></li>
-      <li><span class="prompt">take a screenshot</span>
-        <br><em>The current view is exported as a PNG image in a new browser tab.</em></li>
+      <li><span class="prompt">list processing templates</span>
+        <br><em>Shows all server-side raster functions available for this layer.</em></li>
     </ol>
   </div>
 </div>
@@ -554,8 +635,10 @@ The AI orchestrator selects the best agent for each user request based on the ag
       <li><span class="prompt">load https://tiles.arcgis.com/.../3DTilesServer/tileset.json</span>
         <br><em>Load Layer Agent detects a 3D Tiles layer, auto-switches to 3D SceneView, and loads it.</em></li>
       <li><span class="prompt">fix the floating mesh</span>
-        <br><em>Elevation Offset Agent samples terrain at 25 points across the layer extent,
-        calculates the ground-level offset, and applies the correction.</em></li>
+        <br><em>Elevation Offset Agent uses hitTest to detect the layer surface, samples terrain,
+        and snaps the layer to the ground automatically.</em></li>
+      <li><span class="prompt">calculate offset</span>
+        <br><em>Reports exactly how far the layer is from the ground without changing anything.</em></li>
       <li><span class="prompt">raise by 2 meters</span>
         <br><em>Fine-tunes the offset with a relative +2m adjustment.</em></li>
       <li><span class="prompt">measure distance in feet</span>
@@ -593,7 +676,7 @@ The AI orchestrator selects the best agent for each user request based on the ag
     <p><strong>Scenario:</strong> A new user learning the application.</p>
     <ol>
       <li><span class="prompt">what can you do?</span>
-        <br><em>All Capabilities Agent lists every available function with descriptions.</em></li>
+        <br><em>Help Agent explains the assistant's capabilities and available commands.</em></li>
       <li><span class="prompt">zoom to San Francisco</span>
         <br><em>Navigation Agent flies the map to San Francisco.</em></li>
       <li><span class="prompt">load world imagery</span>
