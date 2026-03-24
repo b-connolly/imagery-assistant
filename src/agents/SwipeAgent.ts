@@ -234,11 +234,14 @@ export function registerSwipeAgent(assistant: HTMLElement) {
     id: agentId,
     name: "Swipe / Compare",
     description:
-      "Activates a swipe tool to compare two layers side by side. " +
+      "Activates a swipe tool to visually compare two layers side by side on the map. " +
       "Drag a handle across the map to reveal one layer on each side. " +
       "Supports horizontal (left/right) and vertical (top/bottom) directions. " +
       "Use when the user wants to compare, swipe, split, or see differences between two layers. " +
-      "Also use when the user says 'clear swipe' or 'stop comparing'.",
+      "Handles 'compare layer 1 and layer 2', 'compare layer 3 and layer 5', " +
+      "'swipe between X and Y', 'side by side', 'versus'. " +
+      "Also use when the user says 'clear swipe' or 'stop comparing'. " +
+      "Keywords: compare, swipe, split, side by side, versus, vs, compare layer.",
     createGraph,
   });
 }

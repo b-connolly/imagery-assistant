@@ -581,22 +581,37 @@ export function registerLayerInfoAgent(assistant: HTMLElement) {
       if (wantsAll) {
         targetLayers = layers;
       } else {
-        // Try to extract a layer name from the user text
-        // Remove common filler words to isolate the layer name
-        const stripped = lower
-          .replace(
-            /\b(tell|me|about|show|info|information|details|describe|query|what|are|the|fields|attributes|metadata|popup|for|of|on|in|layer|table|tables|data|get|list|properties)\b/gi,
-            ""
-          )
-          .trim();
-
-        const matched = stripped.length > 1 ? findLayerByTitle(layers, stripped) : null;
-
-        if (matched) {
-          targetLayers = [matched];
+        // Check for numeric layer reference: "describe layer 4", "info on layer 2"
+        const numMatch = text.match(/\blayer\s*#?\s*(\d+)\b/i);
+        if (numMatch) {
+          const idx = parseInt(numMatch[1], 10) - 1; // 1-based → 0-based
+          if (idx >= 0 && idx < layers.length) {
+            targetLayers = [layers[idx]];
+          } else {
+            return {
+              outputMessage: `Layer ${numMatch[1]} does not exist. There are ${layers.length} layers on the map.`,
+            };
+          }
         } else {
-          // Default: summarize all layers
-          targetLayers = layers;
+          // Try to extract a layer name from the user text
+          const stripped = lower
+            .replace(
+              /\b(tell|me|about|show|info|information|details|describe|query|what|are|the|fields|attributes|metadata|popup|for|of|on|in|layer|table|tables|data|get|list|properties)\b/gi,
+              ""
+            )
+            .trim();
+
+          const matched = stripped.length > 1 ? findLayerByTitle(layers, stripped) : null;
+
+          if (matched) {
+            targetLayers = [matched];
+          } else if (layers.length === 1) {
+            // Only one layer — describe it
+            targetLayers = layers;
+          } else {
+            // Default: summarize all layers
+            targetLayers = layers;
+          }
         }
       }
 
@@ -632,10 +647,12 @@ export function registerLayerInfoAgent(assistant: HTMLElement) {
       "Query layers for detailed information including fields, attributes, popup configuration, " +
       "metadata, tables, sublayers, capabilities, spatial reference, extent, and processing templates. " +
       "Also computes raster statistics (min, max, mean, standard deviation) for imagery and elevation layers. " +
+      "Handles 'what is the layer order', 'list layers', 'describe layer 4', 'describe [layer name]'. " +
       "Use when the user asks about layer properties, attributes, fields, schema, popup info, " +
-      "metadata, what data a layer contains, available tables, or raster/elevation statistics. " +
+      "metadata, what data a layer contains, available tables, layer order, draw order, or raster/elevation statistics. " +
       "Keywords: fields, attributes, columns, schema, popup, metadata, tables, info, describe, " +
       "properties, capabilities, band count, pixel type, processing templates, sublayers, " +
+      "layer order, draw order, what layers, list layers, describe layer, " +
       "statistics, stats, minimum, maximum, lowest, highest, average, mean, elevation value, pixel range.",
     createGraph,
   });

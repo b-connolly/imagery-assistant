@@ -6,7 +6,6 @@ import { z } from "zod";
 import {
   createLayerFromUrl,
   createLayerFromItemId,
-  isElevationService,
   handleElevationRouting,
 } from "../utils/layerFactory";
 import { searchAllItems, searchWebMaps, searchWebScenes, getPortalItemUrl } from "../utils/portalSearch";
@@ -16,7 +15,6 @@ import {
   applyStretch,
   applyServerTemplate,
   getServerTemplates,
-  findServerTemplate,
   type StretchType,
 } from "../utils/rasterFunctions";
 import { REQUIRES_3D, extractLastUserText, createAgentState, registerAgentElement, findLayerByTitle, elapsed, AGENT_KEYWORDS } from "../utils/agentHelpers";
@@ -198,9 +196,10 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
 
         let target: any = stripped.length > 1 ? findLayerByTitle(allLayers, stripped) : null;
 
-        // If no specific name matched, auto-select if there's only one operational layer
-        // (ignore ground/elevation placeholder GroupLayers)
-        if (!target) {
+        // If no specific name matched, auto-select only when the user didn't provide
+        // a meaningful name (e.g., "zoom to layer" / "zoom to it" vs "zoom to Phoenix").
+        // A substantive stripped string means the user likely wants a place, not a layer.
+        if (!target && stripped.length <= 2) {
           const operationalLayers = layers.filter(
             (l: any) => l.type !== "group" || !l.title?.includes("(Elevation)")
           );
@@ -222,7 +221,7 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
             if (qLayer) {
               try {
                 if (qLayer.loadStatus !== "loaded" && typeof qLayer.load === "function") await qLayer.load();
-                const result = await withTimeout(qLayer.queryExtent(), 5000, "queryExtent");
+                const result: any = await withTimeout(qLayer.queryExtent(), 5000, "queryExtent");
                 zoomExtent = result?.extent;
               } catch { /* timeout or error */ }
             }
@@ -241,10 +240,9 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
           return { outputMessage: `Layer "${title}" does not have a valid extent to zoom to.` };
         }
 
-        const names = allLayers.map((l: any) => `"${l.title || "Untitled"}"`).join(", ");
-        return {
-          outputMessage: `Couldn't identify which layer to zoom to. Available layers: ${names}. Please specify the layer name.`,
-        };
+        // No layer matched — this is likely a place/city name (e.g., "zoom to Phoenix").
+        // Bail out with empty message so the built-in navigation agent can geocode it.
+        return { outputMessage: "" };
       }
 
       // ── Load a Web Map or Web Scene by name ────────────────────────────
@@ -534,7 +532,7 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
               if (queryableLayer.loadStatus !== "loaded" && typeof queryableLayer.load === "function") {
                 await queryableLayer.load();
               }
-              const result = await withTimeout(queryableLayer.queryExtent(), 5000, "queryExtent");
+              const result: any = await withTimeout(queryableLayer.queryExtent(), 5000, "queryExtent");
               zoomTarget = result?.extent;
             } catch { /* timeout or error — fall through */ }
           }
@@ -584,7 +582,6 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
           const imgLayer = layer as ImageryLayer;
           const textLower = text.toLowerCase();
 
-          let serverFnApplied = false;
           const templates = getServerTemplates(imgLayer);
           if (templates.length > 0) {
             const matchedFn = templates.find(
@@ -593,7 +590,6 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
             if (matchedFn) {
               applyServerTemplate(imgLayer, matchedFn.name);
               results.push(`Applied "${matchedFn.name}" processing template.`);
-              serverFnApplied = true;
             }
           }
 
@@ -604,7 +600,7 @@ export function registerLoadLayerAgent(assistant: HTMLElement) {
           ];
           for (const [keywords, stretchType] of stretchMap) {
             if (keywords.some((k) => textLower.includes(k))) {
-              applyStretch(imgLayer, stretchType, 2, !serverFnApplied);
+              applyStretch(imgLayer, stretchType, { stdDevs: 2 });
               results.push(`Applied ${stretchType} stretch.`);
               break;
             }

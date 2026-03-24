@@ -267,7 +267,7 @@ async function addMultipleResultsToMap(
               if (queryableLayer.loadStatus !== "loaded" && typeof queryableLayer.load === "function") {
                 await queryableLayer.load();
               }
-              const result = await withTimeout(queryableLayer.queryExtent(), 5000, "queryExtent");
+              const result: any = await withTimeout(queryableLayer.queryExtent(), 5000, "queryExtent");
               zoomTarget = result?.extent;
             } catch { /* fall through — timeout or error */ }
           }
