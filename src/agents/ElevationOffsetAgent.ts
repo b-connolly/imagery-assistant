@@ -42,7 +42,7 @@ const elevationOffsetTool = tool(async (args) => JSON.stringify(args), {
 interface OffsetIntent {
   layerName: string | null;
   manualOffset: number | null;
-  action: "auto-fix" | "set-offset" | "add-offset" | "check" | "click-to-fix";
+  action: "auto-fix" | "set-offset" | "add-offset" | "check" | "click-to-fix" | "calculate-offset";
 }
 
 // Track click handler for cleanup
@@ -75,11 +75,35 @@ function quickExtractOffsetIntent(text: string): OffsetIntent | null {
     return { layerName, manualOffset: null, action: "check" };
   }
 
+  if (/calculate\s*offset|detect\s*offset|measure\s*offset|how\s*far\s*(off|from\s*ground)/i.test(text)) {
+    return { layerName, manualOffset: null, action: "calculate-offset" };
+  }
+
   // "fix elevation by clicking" / "click to set ground" / "pick ground point"
   if (/\b(click|pick|select|choose)\s*(a\s+)?(point|location|spot|ground|elevation|place)/i.test(text) ||
       /\b(elevation|ground|offset)\s*(by|from|via)\s*(click|picking|selecting|map)/i.test(text) ||
       /\bfix\s*(elevation|offset)\s*(by|from|with)\s*(click|map|point)/i.test(text)) {
     return { layerName, manualOffset: null, action: "click-to-fix" };
+  }
+
+  // Check for a specific number BEFORE the auto-fix catch-all.
+  // "fix elevation to 0m" should be set-offset, not auto-fix.
+  const numMatch = text.match(/(-?\d+(?:\.\d+)?)\s*(?:m\b|meters?\b|ft\b|feet\b|')/i);
+  if (numMatch) {
+    let value = parseFloat(numMatch[1]);
+    const unitPart = numMatch[0].toLowerCase();
+    if (/ft|feet|'/.test(unitPart)) value *= 0.3048;
+
+    const isSubtract = /subtract|lower|drop|move\s*down|reduce|minus|negative/i.test(text);
+    if (isSubtract) value = -Math.abs(value);
+
+    const isRelative = /\b(add|raise|lift|subtract|lower|drop|move\s*up|move\s*down)\b/i.test(text);
+
+    return {
+      layerName,
+      manualOffset: value,
+      action: isRelative ? "add-offset" : "set-offset",
+    };
   }
 
   if (
@@ -93,23 +117,7 @@ function quickExtractOffsetIntent(text: string): OffsetIntent | null {
     return { layerName, manualOffset: null, action: "auto-fix" };
   }
 
-  const numMatch = text.match(/(-?\d+(?:\.\d+)?)\s*(?:m\b|meters?\b|ft\b|feet\b|')/i);
-  if (!numMatch) return null;
-
-  let value = parseFloat(numMatch[1]);
-  const unitPart = numMatch[0].toLowerCase();
-  if (/ft|feet|'/.test(unitPart)) value *= 0.3048;
-
-  const isSubtract = /subtract|lower|drop|move\s*down|reduce|minus|negative/i.test(text);
-  if (isSubtract) value = -Math.abs(value);
-
-  const isRelative = /\b(add|raise|lift|subtract|lower|drop|move\s*up|move\s*down)\b/i.test(text);
-
-  return {
-    layerName,
-    manualOffset: value,
-    action: isRelative ? "add-offset" : "set-offset",
-  };
+  return null;
 }
 
 /**
@@ -292,29 +300,63 @@ export function registerElevationOffsetAgent(assistant: HTMLElement) {
 
         const handle = view.on("click", async (event: any) => {
           try {
-            // Query terrain elevation at clicked point
+            // 1. Use hitTest to find where the 3D layer actually renders
+            const hitResult = await view.hitTest(event, { include: [targetLayer] });
+            const layerHit = hitResult.results?.find((r: any) => r.type === "graphic" && r.mapPoint);
+
+            // 2. Query terrain elevation at the same XY
             const ground = view.map?.ground;
-            if (!ground) return;
+            const clickPoint = layerHit?.mapPoint ?? event.mapPoint;
+            let terrainZ = 0;
+            if (ground?.queryElevation) {
+              try {
+                const elevResult = await withTimeout(
+                  ground.queryElevation(clickPoint), 15000, "Query terrain at click"
+                ) as any;
+                terrainZ = elevResult.geometry?.z ?? 0;
+              } catch { /* use 0 */ }
+            }
 
-            const result = await withTimeout(ground.queryElevation(event.mapPoint), 15000, "Query elevation at click point");
-            const terrainZ = result.geometry?.z ?? 0;
+            // 3. Compute offset
+            const currentMode = targetLayerAny.elevationInfo?.mode ?? "absolute-height";
+            const currentOff: number = targetLayerAny.elevationInfo?.offset ?? 0;
 
-            // Apply offset
-            const newOffset = terrainZ;
-            targetLayerAny.elevationInfo = {
-              mode: "absolute-height",
-              offset: newOffset,
-            };
-            refreshLayer(view, targetLayer);
+            if (layerHit?.mapPoint) {
+              // We hit the layer — compute delta between terrain and layer surface
+              const layerZ = layerHit.mapPoint.z ?? 0;
+              const delta = terrainZ - layerZ;
+              const newOffset = currentOff + delta;
 
-            console.log("[ElevOffset] Click-to-fix: terrain Z =", terrainZ, "applied offset:", newOffset);
+              targetLayerAny.elevationInfo = {
+                mode: currentMode,
+                offset: newOffset,
+              };
+              refreshLayer(view, targetLayer);
 
-            // Show result via popup
-            view.popup?.open({
-              title: `Elevation Fixed: ${targetLayer.title}`,
-              content: `Ground elevation at click: ${terrainZ.toFixed(1)}m\nApplied offset: ${newOffset.toFixed(1)}m`,
-              location: event.mapPoint,
-            });
+              console.log("[ElevOffset] Click-to-fix: layerZ:", layerZ, "terrainZ:", terrainZ,
+                "delta:", delta, "newOffset:", newOffset);
+
+              view.popup?.open({
+                title: `Elevation Fixed: ${targetLayer.title}`,
+                content: `Layer surface: ${layerZ.toFixed(1)}m | Terrain: ${terrainZ.toFixed(1)}m | Adjusted by ${delta.toFixed(1)}m → offset: ${newOffset.toFixed(1)}m`,
+                location: event.mapPoint,
+              });
+            } else {
+              // Didn't hit the layer — layer is underground. Set relative-to-ground.
+              targetLayerAny.elevationInfo = {
+                mode: "relative-to-ground",
+                offset: 0,
+              };
+              refreshLayer(view, targetLayer);
+
+              console.log("[ElevOffset] Click-to-fix: layer not hit (underground?), set relative-to-ground, terrainZ:", terrainZ);
+
+              view.popup?.open({
+                title: `Elevation Fixed: ${targetLayer.title}`,
+                content: `Layer was not visible at click point (may be underground). Set to ground-relative mode. Terrain: ${terrainZ.toFixed(1)}m.`,
+                location: event.mapPoint,
+              });
+            }
           } catch (err: any) {
             console.error("[ElevOffset] Click-to-fix error:", err);
           }
@@ -327,7 +369,7 @@ export function registerElevationOffsetAgent(assistant: HTMLElement) {
         elevClickRemove = () => handle.remove();
 
         return {
-          outputMessage: `Click anywhere on the map to set the ground reference elevation for "${layer.title}". The terrain elevation at that point will be used as the offset.`,
+          outputMessage: `Click **on the 3D layer** to snap it to the ground. The agent will detect the gap between the layer surface and terrain, then adjust the offset automatically.`,
         };
       }
 
@@ -343,6 +385,65 @@ export function registerElevationOffsetAgent(assistant: HTMLElement) {
             `Layer "${layer.title}" — current elevation offset: ${currentOffset}m. ${zInfo}` +
             `Mode: ${currentElevInfo?.mode ?? "not set"}. (${elapsedTime}s)`,
         };
+      }
+
+      // ── Calculate offset (diagnostic — no changes applied) ───────────
+      if (intent.action === "calculate-offset") {
+        const fullExtent = layer.fullExtent;
+        if (!fullExtent) {
+          return { outputMessage: `"${layer.title}" has no extent. Cannot calculate offset.` };
+        }
+
+        // Get the center of the layer extent
+        const cx = (fullExtent.xmin + fullExtent.xmax) / 2;
+        const cy = (fullExtent.ymin + fullExtent.ymax) / 2;
+
+        // Query terrain Z at center
+        const ground = view.map?.ground;
+        let terrainZ = 0;
+        if (ground?.queryElevation) {
+          try {
+            const Point = (await import("@arcgis/core/geometry/Point")).default;
+            const pt = new Point({ x: cx, y: cy, spatialReference: fullExtent.spatialReference });
+            const elevResult = await withTimeout(ground.queryElevation(pt), 15000, "Query terrain at layer center") as any;
+            terrainZ = elevResult.geometry?.z ?? 0;
+          } catch { /* use 0 */ }
+        }
+
+        // hitTest at screen center of the layer to find layer surface Z
+        let layerZ: number | null = null;
+        try {
+          const Point = (await import("@arcgis/core/geometry/Point")).default;
+          const centerPt = new Point({ x: cx, y: cy, spatialReference: fullExtent.spatialReference });
+          const screenPt = view.toScreen(centerPt);
+          if (screenPt) {
+            const hitResult = await view.hitTest(screenPt, { include: [layer] });
+            const hit = (hitResult as any).results?.find((r: any) => r.type === "graphic" && r.mapPoint);
+            if (hit?.mapPoint) {
+              layerZ = hit.mapPoint.z ?? null;
+            }
+          }
+        } catch { /* continue */ }
+
+        const mode = currentElevInfo?.mode ?? "not set";
+        const lines: string[] = [
+          `**Offset calculation for "${layer.title}":**`,
+          `- Current mode: ${mode}, offset: ${currentOffset.toFixed(1)}m`,
+          `- Terrain elevation at center: ${terrainZ.toFixed(1)}m`,
+        ];
+
+        if (layerZ !== null) {
+          const delta = terrainZ - layerZ;
+          const direction = delta > 0 ? "below" : "above";
+          lines.push(`- Layer surface Z at center: ${layerZ.toFixed(1)}m`);
+          lines.push(`- Layer is **${Math.abs(delta).toFixed(1)}m ${direction}** the ground`);
+          lines.push(`\nTo fix, say: **"raise by ${delta.toFixed(1)}m"**`);
+        } else {
+          lines.push(`- Layer surface: **not visible** (may be underground)`);
+          lines.push(`\nTry: **"raise by 2m"** and run calculate again.`);
+        }
+
+        return { outputMessage: lines.join("\n") };
       }
 
       // ── Set manual offset (absolute or relative) ─────────────────────
@@ -410,8 +511,8 @@ export function registerElevationOffsetAgent(assistant: HTMLElement) {
           points: sampleCoords,
           spatialReference,
         });
-        const result = await withTimeout(ground.queryElevation(multipoint), 30000, "Query terrain elevation samples");
-        const sampledPoints = (result.geometry as any).points as number[][];
+        const result = await withTimeout(ground.queryElevation(multipoint), 30000, "Query terrain elevation samples") as any;
+        const sampledPoints = result.geometry?.points as number[][];
         const validZs = sampledPoints.map((p: number[]) => p[2]).filter((z: number) => isFinite(z));
 
         if (validZs.length === 0) {
@@ -442,17 +543,42 @@ export function registerElevationOffsetAgent(assistant: HTMLElement) {
         };
       }
 
-      const newOffset = currentOffset + terrainZ;
-      console.log("[ElevOffset] Calculated offset:", newOffset, "(avgTerrainZ:", terrainZ, "existingOffset:", currentOffset, ")");
+      // Auto-fix: hitTest to detect layer surface Z, then compute delta to terrain.
+      // If layer is underground (hitTest misses), assume layer Z ≈ 0 and raise by terrainZ.
+      let newOffset = currentOffset;
+      let fixMethod = "none";
+      const mode = layerAny.elevationInfo?.mode ?? "absolute-height";
 
-      if (MESH_TYPES.has(layer.type) && newOffset < 0) {
-        console.warn("[ElevOffset] Negative offset on mesh layer — may not render below ground.");
+      try {
+        const centerScreen = view.toScreen(view.center);
+        let layerHit: any = null;
+
+        if (centerScreen) {
+          const hitResult = await view.hitTest(centerScreen, { include: [layer] });
+          layerHit = (hitResult as any).results?.find((r: any) => r.type === "graphic" && r.mapPoint);
+        }
+
+        if (layerHit?.mapPoint) {
+          // Layer is visible — compute exact delta
+          const layerZ = layerHit.mapPoint.z ?? 0;
+          const delta = terrainZ - layerZ;
+          newOffset = currentOffset + delta;
+          fixMethod = `hitTest (layerZ: ${layerZ.toFixed(1)}m, terrainZ: ${terrainZ.toFixed(1)}m, delta: ${delta.toFixed(1)}m)`;
+        } else {
+          // Layer not visible (underground). Assume layer internal Z ≈ 0,
+          // so raise by terrainZ to bring it to ground level.
+          newOffset = currentOffset + terrainZ;
+          fixMethod = `terrain-raise (layer underground, raised by ${terrainZ.toFixed(1)}m)`;
+        }
+      } catch (hitErr) {
+        console.warn("[ElevOffset] hitTest failed, raising by terrain Z:", hitErr);
+        newOffset = currentOffset + terrainZ;
+        fixMethod = "terrain-raise (hitTest failed)";
       }
 
-      layerAny.elevationInfo = {
-        mode: "absolute-height",
-        offset: newOffset,
-      };
+      layerAny.elevationInfo = { mode, offset: newOffset };
+      console.log("[ElevOffset] Auto-fix method:", fixMethod, "newOffset:", newOffset,
+        "(avgTerrainZ:", terrainZ, "existingOffset:", currentOffset, ")");
 
       refreshLayer(view, layer);
 
@@ -467,15 +593,9 @@ export function registerElevationOffsetAgent(assistant: HTMLElement) {
       const elapsedTime = elapsed(t0);
       const results = [
         `Fixed elevation for "${layer.title}" in ${elapsedTime}s.`,
-        `Avg terrain elevation: ${terrainZ.toFixed(1)}m.`,
-        `Applied offset: ${newOffset.toFixed(1)}m.`,
+        `Terrain avg: ${terrainZ.toFixed(1)}m. Applied offset: ${newOffset.toFixed(1)}m.`,
+        `If still misaligned, try "raise by 2m" or "lower by 1m" to fine-tune, or "fix elevation by clicking" to pick a specific point on the layer.`,
       ];
-
-      if (MESH_TYPES.has(layer.type) && newOffset < 0) {
-        results.push(
-          "Note: Integrated mesh layers may not render below the ground surface even with negative offsets."
-        );
-      }
 
       return { outputMessage: results.join(" ") };
     }
