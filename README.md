@@ -6,12 +6,6 @@ React + Vite app built with ArcGIS Maps SDK, ArcGIS AI Assistant components, and
 
 This project was inspired by and built upon the foundational work of [ralouta/ArcGIS-JavaScript-AI-Component](https://github.com/ralouta/ArcGIS-JavaScript-AI-Component). That project demonstrated how to integrate ArcGIS AI Assistant components with custom agents in a React application and served as the starting point for this imagery-focused extension.
 
-## Demo
-
-A live demo is hosted on AWS S3: **[Imagery Data Assistant Demo](https://esri-imagery-apps.s3.dualstack.us-west-1.amazonaws.com/apps/imagery-assistant/index.html)**
-
-Sign in with your ArcGIS Online account to explore the full capabilities — search for imagery and geospatial content, load layers from URLs or portal items, run raster analysis, perform 2D/3D measurements, and interact with your data through natural language. The demo reflects the latest build from this repository.
-
 ## Disclaimer
 
 This app has been developed with the assistance of AI coding agents. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is just for testing new AI Agent capabilities in ArcGIS Maps SDK for JS. Some features are not fully complete and there are limitations to phrasing at this time.
