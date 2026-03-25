@@ -8,7 +8,7 @@ This project was inspired by and built upon the foundational work of [ralouta/Ar
 
 ## Disclaimer
 
-This app has been developed with the assistance of AI coding agents. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is just for testing new AI Agent capabilities in ArcGIS Maps SDK for JS. Some features are not fully complete and there are limitations to phrasing at this time.
+This app has been vibe-coded with the assistance of Claude. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is just for testing new AI Agent capabilities in ArcGIS Maps SDK for JS and for testing new agent development and deployment for Imagery & 3D content.
 
 ## What It Does
 
@@ -22,6 +22,8 @@ This app has been developed with the assistance of AI coding agents. Review the 
 - Adjust elevation offsets for 3D layers.
 
 ## Custom Agents
+
+This app relies heavily on custom agent development following this [resource](https://developers.arcgis.com/javascript/latest/agentic-apps/ai-custom-agents/).
 
 | Agent | Description |
 |---|---|
