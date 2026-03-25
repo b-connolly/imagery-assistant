@@ -128,12 +128,3 @@ Example prompts:
 - [React 18](https://react.dev/) + [Vite 7](https://vite.dev/)
 - [TypeScript](https://www.typescriptlang.org/)
 
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| Sign-in fails | Check OAuth client ID and redirect URLs in `arcgisAuth.ts` |
-| Layers won't load | Verify the service URL is accessible and the item is shared with your account |
-| Measurement tool doesn't appear | Ensure the map/scene view is fully loaded before requesting a measurement |
-| Volume measurement requires 3D | The agent auto-switches to 3D — if it fails, toggle to Scene view manually |
-| Layer list is empty | Ensure layers have been added to the map; ground-only layers appear as placeholders |
