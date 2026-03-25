@@ -6,9 +6,15 @@ React + Vite app built with ArcGIS Maps SDK, ArcGIS AI Assistant components, and
 
 This project was inspired by and built upon the foundational work of [ralouta/ArcGIS-JavaScript-AI-Component](https://github.com/ralouta/ArcGIS-JavaScript-AI-Component). That project demonstrated how to integrate ArcGIS AI Assistant components with custom agents in a React application and served as the starting point for this imagery-focused extension.
 
+## Demo
+
+A live demo is hosted on AWS S3: **[Imagery Data Assistant Demo](https://esri-imagery-apps.s3.dualstack.us-west-1.amazonaws.com/apps/imagery-assistant/index.html)**
+
+Sign in with your ArcGIS Online account to explore the full capabilities — search for imagery and geospatial content, load layers from URLs or portal items, run raster analysis, perform 2D/3D measurements, and interact with your data through natural language. The demo reflects the latest build from this repository.
+
 ## Disclaimer
 
-This app has been vibe-coded with the assistance of Claude. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is just for testing new AI Agent capabilities in ArcGIS Maps SDK for JS and for testing new agent development and deployment for Imagery & 3D content.
+This app has been developed with the assistance of AI coding agents. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is just for testing new AI Agent capabilities in ArcGIS Maps SDK for JS. Some features are not fully complete and there are limitations to phrasing at this time.
 
 ## What It Does
 
@@ -16,25 +22,29 @@ This app has been vibe-coded with the assistance of Claude. Review the code, con
 - Search your ArcGIS Online organization for imagery, elevation, and other content.
 - Load layers by URL, item ID, or natural-language search.
 - Perform measurements: distance, area, volume, and elevation profiles.
-- Run raster analysis with server-side raster functions.
+- Run raster analysis with server-side processing templates and stretches.
 - Compare layers side-by-side with a swipe tool.
-- Query layer metadata, fields, and service capabilities.
-- Adjust elevation offsets for 3D layers.
+- Query layer metadata, fields, statistics, and service capabilities.
+- Adjust elevation offsets for 3D layers (auto-fix, click-to-fix, or manual).
+- Visualize and filter LiDAR point clouds by classification, color, and density.
+- View oriented imagery with coverage footprints and image galleries.
 
 ## Custom Agents
 
 This app relies heavily on custom agent development following this [resource](https://developers.arcgis.com/javascript/latest/agentic-apps/ai-custom-agents/).
 
-| Agent | Description |
-|---|---|
-| **ContentSearchAgent** | Searches ArcGIS Online for imagery, elevation, and geospatial content with smart filtering |
-| **LoadLayerAgent** | Loads layers by URL or item ID — supports Feature, Imagery, Scene, Tile, WMS, and elevation services |
-| **MeasurementAgent** | Activates distance, area, volume, and elevation profile tools in 2D and 3D |
-| **ImageryAnalysisAgent** | Applies raster functions (NDVI, hillshade, slope, etc.) to Image Service layers |
-| **SwipeAgent** | Enables layer comparison with a leading/trailing swipe tool |
-| **LayerInfoAgent** | Queries layer metadata, fields, statistics, and service capabilities |
-| **ElevationOffsetAgent** | Adjusts Z-offset for 3D layers to correct elevation positioning |
-| **AllCapabilitiesAgent** | Lists all available agent capabilities for the user |
+| Agent | Group | Description |
+|---|---|---|
+| **ContentSearchAgent** | Discovery | Searches ArcGIS Online for imagery, elevation, and geospatial content with smart filtering |
+| **LoadLayerAgent** | Discovery | Loads layers by URL or item ID — supports Feature, Imagery, Scene, Tile, WMS, and elevation services |
+| **ImageryToolsAgent** | Visualization | Applies stretches, color ramps, server-side processing templates, and pixel identification |
+| **PointCloudAgent** | Visualization | Controls LiDAR point cloud styling — classification filtering, color by elevation/intensity/RGB |
+| **OrientedImageryAgent** | Visualization | Opens the Oriented Imagery viewer for street-level and oblique imagery |
+| **CatalogLayerAgent** | Visualization | Interactive filter panel for browsing items in Catalog Layers by type |
+| **SwipeAgent** | Analysis | Enables layer comparison with a leading/trailing swipe tool |
+| **LayerInfoAgent** | Analysis | Queries layer metadata, fields, statistics, layer order, and service capabilities |
+| **MeasurementAgent** | Analysis | Activates distance, area, volume, and elevation profile tools in 2D and 3D |
+| **ElevationOffsetAgent** | Analysis | Fixes 3D layer vertical alignment with auto-fix, click-to-fix, and manual offset |
 
 ## Local Development Requirements
 
@@ -102,13 +112,18 @@ Example prompts:
 
 **Imagery analysis**
 - `apply NDVI to the satellite imagery layer`
-- `show hillshade`
-- `apply slope analysis`
+- `apply the hillshade template`
+- `identify pixels on click`
 
 **Layer info & comparison**
 - `what fields does the oriented imagery layer have?`
+- `describe layer 4`
 - `swipe between the two imagery layers`
-- `what can this app do?`
+
+**3D & point cloud**
+- `fix the floating mesh`
+- `show only ground and buildings`
+- `color by elevation`
 
 ## Tech Stack
 
