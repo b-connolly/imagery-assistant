@@ -1,13 +1,32 @@
-import { StateGraph, START, END } from "@langchain/langgraph/web";
+import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
+import type { RunnableConfig } from "@langchain/core/runnables";
+import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
+import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
 import { getCurrentView, getMapSceneElement, onViewChange } from "../../utils/viewManager";
 import {
   extractLastUserText,
-  createAgentState,
-  registerAgentElement,
   findLayerByTitle,
   elapsed,
   AGENT_KEYWORDS,
 } from "../../utils/agentHelpers";
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+const OrientedImageryState = Annotation.Root({
+  messages: Annotation<ChatHistory>({
+    reducer: messagesStateReducer,
+    default: () => [],
+  }),
+  outputMessage: Annotation<string>({
+    reducer: (current = "", update) =>
+      typeof update === "string" && update.trim()
+        ? (current ? `${current}\n\n${update}` : update)
+        : current,
+    default: () => "",
+  }),
+});
+
+type OrientedImageryStateType = typeof OrientedImageryState.State;
 
 // ── Active viewer tracking ──────────────────────────────────────────────────
 
@@ -162,13 +181,9 @@ function findOILayer(view: any, layerName: string | null): any | null {
 
 // ── Agent registration ──────────────────────────────────────────────────────
 
-export function registerOrientedImageryAgent(assistant: HTMLElement) {
-  const agentId = "oriented-imagery-agent";
-
-  const createGraph = () => {
-    const state = createAgentState();
-
-    async function oiNode(s: any) {
+const createOrientedImageryGraph = () => {
+    async function oiNode(s: OrientedImageryStateType, config?: RunnableConfig) {
+      await sendTraceMessage({ text: "OrientedImagery: processing request" }, config);
       const text = extractLastUserText(s);
       const t0 = performance.now();
       console.log("[OrientedImagery] Starting. User text:", text);
@@ -283,22 +298,22 @@ export function registerOrientedImageryAgent(assistant: HTMLElement) {
       }
     }
 
-    return new StateGraph(state)
+    return new StateGraph(OrientedImageryState)
       .addNode("oiNode", oiNode)
       .addEdge(START, "oiNode")
       .addEdge("oiNode", END);
-  };
+};
 
-  registerAgentElement(assistant, {
-    id: agentId,
-    name: "Oriented Imagery Viewer",
-    description:
-      "Opens and manages the Oriented Imagery Viewer for exploring non-nadir imagery (photos, 360, oblique, video) " +
-      "from camera locations on the map. Supports navigation, image enhancement, coverage footprints, and image gallery. " +
-      "Use when the user mentions oriented imagery viewer, show viewer, open viewer, close viewer, " +
-      "image viewer, OI viewer, coverage footprint, image gallery, navigation tool, or image enhancement. " +
-      "Keywords: oriented imagery viewer, open viewer, close viewer, show viewer, hide viewer, " +
-      "image gallery, navigation tool, image enhancement, coverage footprint, OI viewer.",
-    createGraph,
-  });
-}
+export const OrientedImageryAgent: AgentRegistration = {
+  id: "oriented-imagery-agent",
+  name: "Oriented Imagery Viewer",
+  description:
+    "Opens and manages the Oriented Imagery Viewer for exploring non-nadir imagery (photos, 360, oblique, video) " +
+    "from camera locations on the map. Supports navigation, image enhancement, coverage footprints, and image gallery. " +
+    "Use when the user mentions oriented imagery viewer, show viewer, open viewer, close viewer, " +
+    "image viewer, OI viewer, coverage footprint, image gallery, navigation tool, or image enhancement. " +
+    "Keywords: oriented imagery viewer, open viewer, close viewer, show viewer, hide viewer, " +
+    "image gallery, navigation tool, image enhancement, coverage footprint, OI viewer.",
+  createGraph: createOrientedImageryGraph,
+  workspace: OrientedImageryState,
+};

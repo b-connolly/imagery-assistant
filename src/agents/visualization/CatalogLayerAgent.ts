@@ -1,13 +1,32 @@
-import { StateGraph, START, END } from "@langchain/langgraph/web";
+import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
+import type { RunnableConfig } from "@langchain/core/runnables";
+import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
+import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
 import { getCurrentView, getMapSceneElement, onViewChange } from "../../utils/viewManager";
 import {
   extractLastUserText,
-  createAgentState,
-  registerAgentElement,
   findLayerByTitle,
   elapsed,
   AGENT_KEYWORDS,
 } from "../../utils/agentHelpers";
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+const CatalogLayerState = Annotation.Root({
+  messages: Annotation<ChatHistory>({
+    reducer: messagesStateReducer,
+    default: () => [],
+  }),
+  outputMessage: Annotation<string>({
+    reducer: (current = "", update) =>
+      typeof update === "string" && update.trim()
+        ? (current ? `${current}\n\n${update}` : update)
+        : current,
+    default: () => "",
+  }),
+});
+
+type CatalogLayerStateType = typeof CatalogLayerState.State;
 
 // ── Active panel tracking ───────────────────────────────────────────────────
 
@@ -293,13 +312,9 @@ function extractCatalogIntent(text: string): { action: CatalogAction; filterType
 
 // ── Agent registration ──────────────────────────────────────────────────────
 
-export function registerCatalogLayerAgent(assistant: HTMLElement) {
-  const agentId = "catalog-layer-agent";
-
-  const createGraph = () => {
-    const state = createAgentState();
-
-    async function catalogNode(s: any) {
+const createCatalogLayerGraph = () => {
+    async function catalogNode(s: CatalogLayerStateType, config?: RunnableConfig) {
+      await sendTraceMessage({ text: "CatalogLayer: processing request" }, config);
       const text = extractLastUserText(s);
       const t0 = performance.now();
       console.log("[CatalogFilter] Starting. User text:", text);
@@ -397,22 +412,22 @@ export function registerCatalogLayerAgent(assistant: HTMLElement) {
       }
     }
 
-    return new StateGraph(state)
+    return new StateGraph(CatalogLayerState)
       .addNode("catalogNode", catalogNode)
       .addEdge(START, "catalogNode")
       .addEdge("catalogNode", END);
-  };
+};
 
-  registerAgentElement(assistant, {
-    id: agentId,
-    name: "Catalog Layer Filter",
-    description:
-      "Opens a filter panel for CatalogLayer items, allowing users to filter by item type " +
-      "(Feature Service, Image Service, etc.). Supports multiple catalog layers with a dropdown selector. " +
-      "Use when the user mentions catalog filter, filter catalog, catalog items, catalog types, " +
-      "item type filter, cd_itemtype, or wants to filter/browse catalog layer contents. " +
-      "Keywords: catalog filter, filter catalog, catalog items, catalog types, item type filter, " +
-      "open catalog filter, close catalog filter, clear catalog filter.",
-    createGraph,
-  });
-}
+export const CatalogLayerAgent: AgentRegistration = {
+  id: "catalog-layer-agent",
+  name: "Catalog Layer Filter",
+  description:
+    "Opens a filter panel for CatalogLayer items, allowing users to filter by item type " +
+    "(Feature Service, Image Service, etc.). Supports multiple catalog layers with a dropdown selector. " +
+    "Use when the user mentions catalog filter, filter catalog, catalog items, catalog types, " +
+    "item type filter, cd_itemtype, or wants to filter/browse catalog layer contents. " +
+    "Keywords: catalog filter, filter catalog, catalog items, catalog types, item type filter, " +
+    "open catalog filter, close catalog filter, clear catalog filter.",
+  createGraph: createCatalogLayerGraph,
+  workspace: CatalogLayerState,
+};

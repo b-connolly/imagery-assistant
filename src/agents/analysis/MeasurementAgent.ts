@@ -1,9 +1,30 @@
-import { StateGraph, START, END } from "@langchain/langgraph/web";
+import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
+import type { RunnableConfig } from "@langchain/core/runnables";
+import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
+import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
 import { getCurrentView, getCurrentViewType, onViewChange, requestViewSwitch } from "../../utils/viewManager";
-import { extractLastUserText, createAgentState, registerAgentElement , elapsed } from "../../utils/agentHelpers";
+import { extractLastUserText , elapsed } from "../../utils/agentHelpers";
 import Collection from "@arcgis/core/core/Collection";
 import ElevationProfileLineGround from "@arcgis/core/analysis/ElevationProfile/ElevationProfileLineGround";
 import ElevationProfileLineScene from "@arcgis/core/analysis/ElevationProfile/ElevationProfileLineScene";
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+const MeasurementState = Annotation.Root({
+  messages: Annotation<ChatHistory>({
+    reducer: messagesStateReducer,
+    default: () => [],
+  }),
+  outputMessage: Annotation<string>({
+    reducer: (current = "", update) =>
+      typeof update === "string" && update.trim()
+        ? (current ? `${current}\n\n${update}` : update)
+        : current,
+    default: () => "",
+  }),
+});
+
+type MeasurementStateType = typeof MeasurementState.State;
 
 // ── Active widget tracking ──────────────────────────────────────────────────
 
@@ -175,197 +196,197 @@ function createMeasurementComponent(
   return wrapper;
 }
 
-// ── Agent registration ──────────────────────────────────────────────────────
+// ── Agent ────────────────────────────────────────────────────────────────────
 
-export function registerMeasurementAgent(assistant: HTMLElement) {
-  const agentId = "measurement-agent";
+async function measurementNode(s: MeasurementStateType, config?: RunnableConfig) {
+  await sendTraceMessage({ text: "Measurement: processing request" }, config);
 
-  const createGraph = () => {
-    const state = createAgentState();
+  const text = extractLastUserText(s);
+  const t0 = performance.now();
+  console.log("[Measurement] Starting. User text:", text);
 
-    async function measurementNode(s: any) {
-      const text = extractLastUserText(s);
-      const t0 = performance.now();
-      console.log("[Measurement] Starting. User text:", text);
+  const view = getCurrentView() as any;
+  if (!view) {
+    return { outputMessage: "No active map or scene view. Please wait for the view to load." };
+  }
 
-      const view = getCurrentView() as any;
-      if (!view) {
-        return { outputMessage: "No active map or scene view. Please wait for the view to load." };
+  const action = extractMeasureIntent(text);
+  const is3D = getCurrentViewType() === "3d";
+
+  console.log("[Measurement] Action:", action, "3D:", is3D);
+
+  switch (action) {
+    case "clear": {
+      if (!activeElement) {
+        return { outputMessage: "No measurement tool is currently active." };
       }
-
-      const action = extractMeasureIntent(text);
-      const is3D = getCurrentViewType() === "3d";
-
-      console.log("[Measurement] Action:", action, "3D:", is3D);
-
-      switch (action) {
-        case "clear": {
-          if (!activeElement) {
-            return { outputMessage: "No measurement tool is currently active." };
-          }
-          const was = activeWidgetType;
-          clearActiveWidget();
-          return { outputMessage: `Cleared the ${was} measurement tool.` };
-        }
-
-        case "help": {
-          return {
-            outputMessage:
-              "Available measurement tools:\n" +
-              "- **Distance**: \"measure distance\" — click points on the map to measure length\n" +
-              "- **Area**: \"measure area\" — draw a polygon to measure area\n" +
-              "- **Volume**: \"measure volume\" — draw a polygon in 3D to calculate cut/fill or stockpile volume\n" +
-              "- **Elevation Profile**: \"elevation profile\" — draw a line to see elevation changes\n" +
-              "- **Clear**: \"clear measurement\" or click the **X** button to close the active tool\n\n" +
-              "You can specify units: \"measure distance in kilometers\", \"measure area in acres\".\n" +
-              "For volume, specify mode: \"measure stockpile volume\" or \"cut and fill volume\".",
-          };
-        }
-
-        case "distance": {
-          clearActiveWidget();
-
-          const linearUnit = extractLinearUnit(text);
-          const tagName = is3D
-            ? "arcgis-direct-line-measurement-3d"
-            : "arcgis-distance-measurement-2d";
-
-          const el = createMeasurementComponent(tagName, linearUnit);
-          if (!el) {
-            return { outputMessage: "Could not find the map/scene element to attach the measurement tool." };
-          }
-
-          activeElement = el;
-          activeWidgetType = "distance";
-
-          const elapsedTime = elapsed(t0);
-          const unitMsg = linearUnit ? ` (${linearUnit})` : "";
-          return {
-            outputMessage: `Distance measurement tool activated${unitMsg} in ${elapsedTime}s. Click on the map to measure.`,
-          };
-        }
-
-        case "area": {
-          clearActiveWidget();
-
-          const areaUnit = extractAreaUnit(text);
-          const tagName = is3D
-            ? "arcgis-area-measurement-3d"
-            : "arcgis-area-measurement-2d";
-
-          const el = createMeasurementComponent(tagName, areaUnit);
-          if (!el) {
-            return { outputMessage: "Could not find the map/scene element to attach the measurement tool." };
-          }
-
-          activeElement = el;
-          activeWidgetType = "area";
-
-          const elapsedTime = elapsed(t0);
-          const unitMsg = areaUnit ? ` (${areaUnit.replace("-", " ")})` : "";
-          return {
-            outputMessage: `Area measurement tool activated${unitMsg} in ${elapsedTime}s. Click on the map to draw a polygon.`,
-          };
-        }
-
-        case "elevation-profile": {
-          clearActiveWidget();
-
-          const linearUnit = extractLinearUnit(text);
-          const wrapper = createMeasurementComponent("arcgis-elevation-profile", linearUnit);
-          if (!wrapper) {
-            return { outputMessage: "Could not find the map/scene element to attach the elevation profile tool." };
-          }
-
-          // Configure profiles on the inner component to include both
-          // ground terrain and 3D scene objects (buildings, meshes, etc.)
-          const profileEl = wrapper.querySelector("arcgis-elevation-profile") as any;
-          if (profileEl) {
-            profileEl.profiles = new Collection([
-              new ElevationProfileLineGround(),
-              new ElevationProfileLineScene(),
-            ]);
-          }
-
-          activeElement = wrapper;
-          activeWidgetType = "elevation-profile";
-
-          const elapsedTime = elapsed(t0);
-          return {
-            outputMessage: `Elevation profile tool activated in ${elapsedTime}s. Draw a line on the map to see elevation for both terrain and 3D objects.`,
-          };
-        }
-
-        case "volume": {
-          clearActiveWidget();
-
-          // Volume measurement requires 3D — switch automatically if needed
-          if (!is3D) {
-            try {
-              await requestViewSwitch("3d");
-            } catch {
-              return {
-                outputMessage:
-                  "Volume measurement requires a 3D scene view. Please switch to 3D using the toggle and try again.",
-              };
-            }
-          }
-
-          const volumeMode = extractVolumeMode(text);
-          const volumeUnit = extractVolumeUnit(text);
-
-          const wrapper = createMeasurementComponent("arcgis-volume-measurement", null);
-          if (!wrapper) {
-            return { outputMessage: "Could not attach the volume measurement tool to the scene." };
-          }
-
-          // Configure the inner volume measurement component
-          const volumeEl = wrapper.querySelector("arcgis-volume-measurement") as any;
-          if (volumeEl) {
-            volumeEl.mode = volumeMode;
-            if (volumeUnit) {
-              volumeEl.volumeDisplayUnit = volumeUnit;
-            }
-          }
-
-          activeElement = wrapper;
-          activeWidgetType = "volume";
-
-          const elapsedTime = elapsed(t0);
-          const modeLabel = volumeMode === "stockpile" ? "Stockpile" : "Cut & Fill";
-          return {
-            outputMessage:
-              `Volume measurement tool activated (${modeLabel} mode) in ${elapsedTime}s. ` +
-              "Draw a polygon on the scene to measure volume. " +
-              (volumeMode === "cut-fill"
-                ? "Use the shift manipulator to set the target elevation, or press Tab to type a value."
-                : "The volume will be calculated relative to the polygon boundary surface."),
-          };
-        }
-      }
+      const was = activeWidgetType;
+      clearActiveWidget();
+      return { outputMessage: `Cleared the ${was} measurement tool.` };
     }
 
-    return new StateGraph(state)
-      .addNode("measurementNode", measurementNode)
-      .addEdge(START, "measurementNode")
-      .addEdge("measurementNode", END);
-  };
+    case "help": {
+      return {
+        outputMessage:
+          "Available measurement tools:\n" +
+          "- **Distance**: \"measure distance\" — click points on the map to measure length\n" +
+          "- **Area**: \"measure area\" — draw a polygon to measure area\n" +
+          "- **Volume**: \"measure volume\" — draw a polygon in 3D to calculate cut/fill or stockpile volume\n" +
+          "- **Elevation Profile**: \"elevation profile\" — draw a line to see elevation changes\n" +
+          "- **Clear**: \"clear measurement\" or click the **X** button to close the active tool\n\n" +
+          "You can specify units: \"measure distance in kilometers\", \"measure area in acres\".\n" +
+          "For volume, specify mode: \"measure stockpile volume\" or \"cut and fill volume\".",
+      };
+    }
 
-  registerAgentElement(assistant, {
-    id: agentId,
-    name: "Measurement Tools",
-    description:
-      "Activates measurement and analysis tools on the map. " +
-      "Supports distance measurement (line length), area measurement (polygon area), " +
-      "volume measurement (cut-fill and stockpile volume in 3D), " +
-      "and elevation profile (terrain cross-section along a drawn line). " +
-      "Works in both 2D and 3D views with appropriate widgets. " +
-      "Volume measurement automatically switches to 3D and works on ground, integrated meshes, and 3D tiles. " +
-      "Supports unit specification: meters, kilometers, feet, miles, acres, hectares, cubic meters, etc. " +
-      "Use when the user wants to measure, calculate distance, area, or volume, draw a ruler, " +
-      "see an elevation profile or cross-section, asks 'how far' between points, " +
-      "or wants to calculate cut/fill, stockpile, excavation, or earthwork volumes. " +
-      "Also use when the user says 'clear measurement' or 'stop measuring'.",
-    createGraph,
-  });
+    case "distance": {
+      clearActiveWidget();
+
+      const linearUnit = extractLinearUnit(text);
+      const tagName = is3D
+        ? "arcgis-direct-line-measurement-3d"
+        : "arcgis-distance-measurement-2d";
+
+      const el = createMeasurementComponent(tagName, linearUnit);
+      if (!el) {
+        return { outputMessage: "Could not find the map/scene element to attach the measurement tool." };
+      }
+
+      activeElement = el;
+      activeWidgetType = "distance";
+
+      const elapsedTime = elapsed(t0);
+      const unitMsg = linearUnit ? ` (${linearUnit})` : "";
+      return {
+        outputMessage: `Distance measurement tool activated${unitMsg} in ${elapsedTime}s. Click on the map to measure.`,
+      };
+    }
+
+    case "area": {
+      clearActiveWidget();
+
+      const areaUnit = extractAreaUnit(text);
+      const tagName = is3D
+        ? "arcgis-area-measurement-3d"
+        : "arcgis-area-measurement-2d";
+
+      const el = createMeasurementComponent(tagName, areaUnit);
+      if (!el) {
+        return { outputMessage: "Could not find the map/scene element to attach the measurement tool." };
+      }
+
+      activeElement = el;
+      activeWidgetType = "area";
+
+      const elapsedTime = elapsed(t0);
+      const unitMsg = areaUnit ? ` (${areaUnit.replace("-", " ")})` : "";
+      return {
+        outputMessage: `Area measurement tool activated${unitMsg} in ${elapsedTime}s. Click on the map to draw a polygon.`,
+      };
+    }
+
+    case "elevation-profile": {
+      clearActiveWidget();
+
+      const linearUnit = extractLinearUnit(text);
+      const wrapper = createMeasurementComponent("arcgis-elevation-profile", linearUnit);
+      if (!wrapper) {
+        return { outputMessage: "Could not find the map/scene element to attach the elevation profile tool." };
+      }
+
+      // Configure profiles on the inner component to include both
+      // ground terrain and 3D scene objects (buildings, meshes, etc.)
+      const profileEl = wrapper.querySelector("arcgis-elevation-profile") as any;
+      if (profileEl) {
+        profileEl.profiles = new Collection([
+          new ElevationProfileLineGround(),
+          new ElevationProfileLineScene(),
+        ]);
+      }
+
+      activeElement = wrapper;
+      activeWidgetType = "elevation-profile";
+
+      const elapsedTime = elapsed(t0);
+      return {
+        outputMessage: `Elevation profile tool activated in ${elapsedTime}s. Draw a line on the map to see elevation for both terrain and 3D objects.`,
+      };
+    }
+
+    case "volume": {
+      clearActiveWidget();
+
+      // Volume measurement requires 3D — switch automatically if needed
+      if (!is3D) {
+        try {
+          await requestViewSwitch("3d");
+        } catch {
+          return {
+            outputMessage:
+              "Volume measurement requires a 3D scene view. Please switch to 3D using the toggle and try again.",
+          };
+        }
+      }
+
+      const volumeMode = extractVolumeMode(text);
+      const volumeUnit = extractVolumeUnit(text);
+
+      const wrapper = createMeasurementComponent("arcgis-volume-measurement", null);
+      if (!wrapper) {
+        return { outputMessage: "Could not attach the volume measurement tool to the scene." };
+      }
+
+      // Configure the inner volume measurement component
+      const volumeEl = wrapper.querySelector("arcgis-volume-measurement") as any;
+      if (volumeEl) {
+        volumeEl.mode = volumeMode;
+        if (volumeUnit) {
+          volumeEl.volumeDisplayUnit = volumeUnit;
+        }
+      }
+
+      activeElement = wrapper;
+      activeWidgetType = "volume";
+
+      const elapsedTime = elapsed(t0);
+      const modeLabel = volumeMode === "stockpile" ? "Stockpile" : "Cut & Fill";
+      return {
+        outputMessage:
+          `Volume measurement tool activated (${modeLabel} mode) in ${elapsedTime}s. ` +
+          "Draw a polygon on the scene to measure volume. " +
+          (volumeMode === "cut-fill"
+            ? "Use the shift manipulator to set the target elevation, or press Tab to type a value."
+            : "The volume will be calculated relative to the polygon boundary surface."),
+      };
+    }
+  }
 }
+
+// ── Graph builder ───────────────────────────────────────────────────────────
+
+const createMeasurementGraph = () =>
+  new StateGraph(MeasurementState)
+    .addNode("measurementNode", measurementNode)
+    .addEdge(START, "measurementNode")
+    .addEdge("measurementNode", END);
+
+// ── Agent registration ──────────────────────────────────────────────────────
+
+export const MeasurementAgent: AgentRegistration = {
+  id: "measurement-agent",
+  name: "Measurement Tools",
+  description:
+    "Activates measurement and analysis tools on the map. " +
+    "Supports distance measurement (line length), area measurement (polygon area), " +
+    "volume measurement (cut-fill and stockpile volume in 3D), " +
+    "and elevation profile (terrain cross-section along a drawn line). " +
+    "Works in both 2D and 3D views with appropriate widgets. " +
+    "Volume measurement automatically switches to 3D and works on ground, integrated meshes, and 3D tiles. " +
+    "Supports unit specification: meters, kilometers, feet, miles, acres, hectares, cubic meters, etc. " +
+    "Use when the user wants to measure, calculate distance, area, or volume, draw a ruler, " +
+    "see an elevation profile or cross-section, asks 'how far' between points, " +
+    "or wants to calculate cut/fill, stockpile, excavation, or earthwork volumes. " +
+    "Also use when the user says 'clear measurement' or 'stop measuring'.",
+  createGraph: createMeasurementGraph,
+  workspace: MeasurementState,
+};

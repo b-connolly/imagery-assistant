@@ -27,7 +27,10 @@ declare namespace JSX {
     "arcgis-volume-measurement": any;
     // ArcGIS AI Assistant
     "arcgis-assistant": any;
-    "arcgis-assistant-agent": any;
+    "arcgis-assistant-agent": any & {
+      agent?: import("@arcgis/ai-components/utils/index.js").AgentRegistration;
+      context?: Record<string, unknown>;
+    };
     "arcgis-assistant-help-agent": any;
     "arcgis-assistant-navigation-agent": any;
     "arcgis-assistant-data-exploration-agent": any;

@@ -1,6 +1,27 @@
-import { StateGraph, START, END } from "@langchain/langgraph/web";
+import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
+import type { RunnableConfig } from "@langchain/core/runnables";
+import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
+import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
 import { getCurrentView, getMapSceneElement } from "../../utils/viewManager";
-import { extractLastUserText, createAgentState, registerAgentElement, findLayerByTitle , elapsed } from "../../utils/agentHelpers";
+import { extractLastUserText, findLayerByTitle, elapsed } from "../../utils/agentHelpers";
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+const SwipeState = Annotation.Root({
+  messages: Annotation<ChatHistory>({
+    reducer: messagesStateReducer,
+    default: () => [],
+  }),
+  outputMessage: Annotation<string>({
+    reducer: (current = "", update) =>
+      typeof update === "string" && update.trim()
+        ? (current ? `${current}\n\n${update}` : update)
+        : current,
+    default: () => "",
+  }),
+});
+
+type SwipeStateType = typeof SwipeState.State;
 
 // ── Active swipe tracking ───────────────────────────────────────────────────
 
@@ -91,157 +112,157 @@ function formatLayerList(layers: any[]): string {
     .join("\n");
 }
 
-// ── Agent registration ──────────────────────────────────────────────────────
+// ── Graph node ──────────────────────────────────────────────────────────────
 
-export function registerSwipeAgent(assistant: HTMLElement) {
-  const agentId = "swipe-agent";
+async function swipeNode(s: SwipeStateType, config?: RunnableConfig) {
+  const text = extractLastUserText(s);
+  const t0 = performance.now();
+  console.log("[Swipe] Starting. User text:", text);
 
-  const createGraph = () => {
-    const state = createAgentState();
+  await sendTraceMessage({ text: "Swipe: processing request" }, config);
 
-    async function swipeNode(s: any) {
-      const text = extractLastUserText(s);
-      const t0 = performance.now();
-      console.log("[Swipe] Starting. User text:", text);
+  const view = getCurrentView() as any;
+  if (!view) {
+    return { outputMessage: "No active map or scene view. Please wait for the view to load." };
+  }
 
-      const view = getCurrentView() as any;
-      if (!view) {
-        return { outputMessage: "No active map or scene view. Please wait for the view to load." };
+  const { action, direction, layerNames } = extractSwipeIntent(text);
+  console.log("[Swipe] Action:", action, "Direction:", direction, "Layers:", layerNames);
+
+  switch (action) {
+    case "clear": {
+      if (clearSwipe()) {
+        return { outputMessage: "Swipe tool removed." };
       }
-
-      const { action, direction, layerNames } = extractSwipeIntent(text);
-      console.log("[Swipe] Action:", action, "Direction:", direction, "Layers:", layerNames);
-
-      switch (action) {
-        case "clear": {
-          if (clearSwipe()) {
-            return { outputMessage: "Swipe tool removed." };
-          }
-          return { outputMessage: "No swipe tool is currently active." };
-        }
-
-        case "help": {
-          return {
-            outputMessage:
-              "**Swipe / Compare Tool**\n\n" +
-              "Compare two layers by swiping between them.\n\n" +
-              "- \"compare layer 1 and layer 2\"\n" +
-              "- \"swipe\" (uses last two layers)\n" +
-              "- \"vertical swipe\" (top/bottom split)\n" +
-              "- \"clear swipe\" (remove the tool)",
-          };
-        }
-
-        case "direction": {
-          if (activeSwipeElement && direction) {
-            (activeSwipeElement as any).direction = direction;
-            return { outputMessage: `Swipe direction changed to ${direction}.` };
-          }
-          return { outputMessage: "No swipe tool is active to change direction." };
-        }
-
-        case "activate": {
-          const layers = view.map?.layers?.toArray() ?? [];
-          if (layers.length < 2) {
-            return {
-              outputMessage:
-                "Need at least 2 layers on the map to compare. " +
-                "Load some layers first, then try again.",
-            };
-          }
-
-          // Resolve which layers to compare
-          let startLayer: any;
-          let endLayer: any;
-
-          if (layerNames && layerNames.length >= 2) {
-            startLayer = findLayerByName(layers, layerNames[0]);
-            endLayer = findLayerByName(layers, layerNames[1]);
-
-            if (!startLayer || !endLayer) {
-              const missing = !startLayer ? layerNames[0] : layerNames[1];
-              return {
-                outputMessage:
-                  `Could not find layer "${missing}". Available layers:\n` +
-                  formatLayerList(layers) +
-                  '\n\nTry "compare layer 1 and layer 2" using the numbers above.',
-              };
-            }
-          } else {
-            // Default: use the last two layers added
-            startLayer = layers[layers.length - 2];
-            endLayer = layers[layers.length - 1];
-          }
-
-          // Clear any existing swipe
-          clearSwipe();
-
-          // Create the arcgis-swipe web component
-          const parent = getMapSceneElement();
-          if (!parent) {
-            return { outputMessage: "Could not find the map element to attach the swipe tool." };
-          }
-
-          const el = document.createElement("arcgis-swipe") as any;
-          el.direction = direction ?? "horizontal";
-          el.position = 50;
-          parent.appendChild(el);
-
-          // Set layers after the element is connected to the DOM
-          // Use requestAnimationFrame to ensure the component initializes
-          await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => {
-              try {
-                el.startLayers = [startLayer];
-                el.endLayers = [endLayer];
-              } catch {
-                // Fallback: try setting via the widget property
-                try {
-                  if (el.widget) {
-                    el.widget.leadingLayers.add(startLayer);
-                    el.widget.trailingLayers.add(endLayer);
-                  }
-                } catch (e2) {
-                  console.warn("[Swipe] Could not set layers:", e2);
-                }
-              }
-              resolve();
-            });
-          });
-
-          activeSwipeElement = el;
-
-          const elapsedTime = elapsed(t0);
-          const dirLabel = (direction ?? "horizontal") === "horizontal" ? "left/right" : "top/bottom";
-          return {
-            outputMessage:
-              `Swipe tool activated (${dirLabel}) in ${elapsedTime}s.\n\n` +
-              `**Left/Start:** ${startLayer.title || "Untitled"}\n` +
-              `**Right/End:** ${endLayer.title || "Untitled"}\n\n` +
-              "Drag the handle to compare. Say \"clear swipe\" to remove, or \"vertical swipe\" to change direction.",
-          };
-        }
-      }
+      return { outputMessage: "No swipe tool is currently active." };
     }
 
-    return new StateGraph(state)
-      .addNode("swipeNode", swipeNode)
-      .addEdge(START, "swipeNode")
-      .addEdge("swipeNode", END);
-  };
+    case "help": {
+      return {
+        outputMessage:
+          "**Swipe / Compare Tool**\n\n" +
+          "Compare two layers by swiping between them.\n\n" +
+          "- \"compare layer 1 and layer 2\"\n" +
+          "- \"swipe\" (uses last two layers)\n" +
+          "- \"vertical swipe\" (top/bottom split)\n" +
+          "- \"clear swipe\" (remove the tool)",
+      };
+    }
 
-  registerAgentElement(assistant, {
-    id: agentId,
-    name: "Swipe / Compare",
-    description:
-      "Activates a swipe tool to visually compare two layers side by side on the map. " +
-      "Drag a handle across the map to reveal one layer on each side. " +
-      "Supports horizontal (left/right) and vertical (top/bottom) directions. " +
-      "Use when the user wants to compare, swipe, split, or see differences between two layers. " +
-      "Handles 'compare layer 1 and layer 2', 'compare layer 3 and layer 5', " +
-      "'swipe between X and Y', 'side by side', 'versus'. " +
-      "Also use when the user says 'clear swipe' or 'stop comparing'. " +
-      "Keywords: compare, swipe, split, side by side, versus, vs, compare layer.",
-    createGraph,
-  });
+    case "direction": {
+      if (activeSwipeElement && direction) {
+        (activeSwipeElement as any).direction = direction;
+        return { outputMessage: `Swipe direction changed to ${direction}.` };
+      }
+      return { outputMessage: "No swipe tool is active to change direction." };
+    }
+
+    case "activate": {
+      const layers = view.map?.layers?.toArray() ?? [];
+      if (layers.length < 2) {
+        return {
+          outputMessage:
+            "Need at least 2 layers on the map to compare. " +
+            "Load some layers first, then try again.",
+        };
+      }
+
+      // Resolve which layers to compare
+      let startLayer: any;
+      let endLayer: any;
+
+      if (layerNames && layerNames.length >= 2) {
+        startLayer = findLayerByName(layers, layerNames[0]);
+        endLayer = findLayerByName(layers, layerNames[1]);
+
+        if (!startLayer || !endLayer) {
+          const missing = !startLayer ? layerNames[0] : layerNames[1];
+          return {
+            outputMessage:
+              `Could not find layer "${missing}". Available layers:\n` +
+              formatLayerList(layers) +
+              '\n\nTry "compare layer 1 and layer 2" using the numbers above.',
+          };
+        }
+      } else {
+        // Default: use the last two layers added
+        startLayer = layers[layers.length - 2];
+        endLayer = layers[layers.length - 1];
+      }
+
+      // Clear any existing swipe
+      clearSwipe();
+
+      // Create the arcgis-swipe web component
+      const parent = getMapSceneElement();
+      if (!parent) {
+        return { outputMessage: "Could not find the map element to attach the swipe tool." };
+      }
+
+      const el = document.createElement("arcgis-swipe") as any;
+      el.direction = direction ?? "horizontal";
+      el.position = 50;
+      parent.appendChild(el);
+
+      // Set layers after the element is connected to the DOM
+      // Use requestAnimationFrame to ensure the component initializes
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          try {
+            el.startLayers = [startLayer];
+            el.endLayers = [endLayer];
+          } catch {
+            // Fallback: try setting via the widget property
+            try {
+              if (el.widget) {
+                el.widget.leadingLayers.add(startLayer);
+                el.widget.trailingLayers.add(endLayer);
+              }
+            } catch (e2) {
+              console.warn("[Swipe] Could not set layers:", e2);
+            }
+          }
+          resolve();
+        });
+      });
+
+      activeSwipeElement = el;
+
+      const elapsedTime = elapsed(t0);
+      const dirLabel = (direction ?? "horizontal") === "horizontal" ? "left/right" : "top/bottom";
+      return {
+        outputMessage:
+          `Swipe tool activated (${dirLabel}) in ${elapsedTime}s.\n\n` +
+          `**Left/Start:** ${startLayer.title || "Untitled"}\n` +
+          `**Right/End:** ${endLayer.title || "Untitled"}\n\n` +
+          "Drag the handle to compare. Say \"clear swipe\" to remove, or \"vertical swipe\" to change direction.",
+      };
+    }
+  }
 }
+
+// ── Graph builder ───────────────────────────────────────────────────────────
+
+const createSwipeGraph = () =>
+  new StateGraph(SwipeState)
+    .addNode("swipeNode", swipeNode)
+    .addEdge(START, "swipeNode")
+    .addEdge("swipeNode", END);
+
+// ── Agent registration ──────────────────────────────────────────────────────
+
+export const SwipeAgent: AgentRegistration = {
+  id: "swipe-agent",
+  name: "Swipe / Compare",
+  description:
+    "Activates a swipe tool to visually compare two layers side by side on the map. " +
+    "Drag a handle across the map to reveal one layer on each side. " +
+    "Supports horizontal (left/right) and vertical (top/bottom) directions. " +
+    "Use when the user wants to compare, swipe, split, or see differences between two layers. " +
+    "Handles 'compare layer 1 and layer 2', 'compare layer 3 and layer 5', " +
+    "'swipe between X and Y', 'side by side', 'versus'. " +
+    "Also use when the user says 'clear swipe' or 'stop comparing'. " +
+    "Keywords: compare, swipe, split, side by side, versus, vs, compare layer.",
+  createGraph: createSwipeGraph,
+  workspace: SwipeState,
+};

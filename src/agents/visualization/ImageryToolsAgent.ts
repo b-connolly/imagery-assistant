@@ -1,10 +1,11 @@
-import { StateGraph, START, END } from "@langchain/langgraph/web";
+import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
+import type { RunnableConfig } from "@langchain/core/runnables";
+import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
+import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
 import ImageryLayer from "@arcgis/core/layers/ImageryLayer";
 import { getCurrentView, onViewChange } from "../../utils/viewManager";
 import {
   extractLastUserText,
-  createAgentState,
-  registerAgentElement,
   findLayerByTitle,
   AGENT_KEYWORDS,
 } from "../../utils/agentHelpers";
@@ -18,6 +19,24 @@ import {
   SDK_COLOR_RAMPS,
   type StretchType,
 } from "../../utils/rasterFunctions";
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+const ImageryToolsState = Annotation.Root({
+  messages: Annotation<ChatHistory>({
+    reducer: messagesStateReducer,
+    default: () => [],
+  }),
+  outputMessage: Annotation<string>({
+    reducer: (current = "", update) =>
+      typeof update === "string" && update.trim()
+        ? (current ? `${current}\n\n${update}` : update)
+        : current,
+    default: () => "",
+  }),
+});
+
+type ImageryToolsStateType = typeof ImageryToolsState.State;
 
 // ── Active click handler tracking ────────────────────────────────────────────
 
@@ -71,13 +90,9 @@ function findImageryLayer(view: any, hint: string | null): ImageryLayer | null {
 
 // ── Agent ────────────────────────────────────────────────────────────────────
 
-export function registerImageryToolsAgent(assistant: HTMLElement) {
-  const agentId = "imagery-tools-agent";
-
-  const createGraph = () => {
-    const state = createAgentState();
-
-    async function imageryToolsNode(s: any) {
+const createImageryToolsGraph = () => {
+    async function imageryToolsNode(s: ImageryToolsStateType, config?: RunnableConfig) {
+      await sendTraceMessage({ text: "ImageryTools: processing request" }, config);
       const text = extractLastUserText(s);
       console.log("[ImageryTools] Starting. User text:", text);
 
@@ -332,26 +347,26 @@ export function registerImageryToolsAgent(assistant: HTMLElement) {
       };
     }
 
-    return new StateGraph(state)
+    return new StateGraph(ImageryToolsState)
       .addNode("imageryToolsNode", imageryToolsNode)
       .addEdge(START, "imageryToolsNode")
       .addEdge("imageryToolsNode", END);
-  };
+};
 
-  registerAgentElement(assistant, {
-    id: agentId,
-    name: "Imagery Tools",
-    description:
-      "Manages imagery layer rendering and analysis. " +
-      "Apply server-side processing templates (NDVI, Hillshade, Slope, Color IR, etc.), " +
-      "enable click-to-identify pixel values, describe imagery layer properties, " +
-      "list available raster functions, and reset rendering to defaults. " +
-      "Use when the user mentions processing template, raster function, identify pixels, " +
-      "pixel values, popup on imagery, apply NDVI, apply hillshade, apply stretch, " +
-      "color infrared, imagery tools, describe imagery, list templates, reset rendering. " +
-      "Keywords: stretch, NDVI, hillshade, slope, aspect, color infrared, false color, " +
-      "processing template, raster function, identify, pixel values, popup, screenshot, " +
-      "imagery tools, band, spectral, rendering, reset rendering, clear function.",
-    createGraph,
-  });
-}
+export const ImageryToolsAgent: AgentRegistration = {
+  id: "imagery-tools-agent",
+  name: "Imagery Tools",
+  description:
+    "Manages imagery layer rendering and analysis. " +
+    "Apply server-side processing templates (NDVI, Hillshade, Slope, Color IR, etc.), " +
+    "enable click-to-identify pixel values, describe imagery layer properties, " +
+    "list available raster functions, and reset rendering to defaults. " +
+    "Use when the user mentions processing template, raster function, identify pixels, " +
+    "pixel values, popup on imagery, apply NDVI, apply hillshade, apply stretch, " +
+    "color infrared, imagery tools, describe imagery, list templates, reset rendering. " +
+    "Keywords: stretch, NDVI, hillshade, slope, aspect, color infrared, false color, " +
+    "processing template, raster function, identify, pixel values, popup, screenshot, " +
+    "imagery tools, band, spectral, rendering, reset rendering, clear function.",
+  createGraph: createImageryToolsGraph,
+  workspace: ImageryToolsState,
+};

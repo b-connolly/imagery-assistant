@@ -1,13 +1,32 @@
-import { StateGraph, START, END } from "@langchain/langgraph/web";
+import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
+import type { RunnableConfig } from "@langchain/core/runnables";
+import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
+import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
 import {
   extractLastUserText,
-  createAgentState,
-  registerAgentElement,
   findLayerByTitle,
   elapsed,
 } from "../../utils/agentHelpers";
 import { getCurrentView } from "../../utils/viewManager";
 import { withTimeout } from "../../utils/safeFetch";
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+const LayerInfoState = Annotation.Root({
+  messages: Annotation<ChatHistory>({
+    reducer: messagesStateReducer,
+    default: () => [],
+  }),
+  outputMessage: Annotation<string>({
+    reducer: (current = "", update) =>
+      typeof update === "string" && update.trim()
+        ? (current ? `${current}\n\n${update}` : update)
+        : current,
+    default: () => "",
+  }),
+});
+
+type LayerInfoStateType = typeof LayerInfoState.State;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -332,328 +351,328 @@ function formatStats(stats: BandStats[], layerTitle: string): string {
 
 // ── Agent ────────────────────────────────────────────────────────────────────
 
-export function registerLayerInfoAgent(assistant: HTMLElement) {
-  const agentId = "layer-info-agent";
+async function infoNode(s: LayerInfoStateType, config?: RunnableConfig) {
+  await sendTraceMessage({ text: "LayerInfo: processing request" }, config);
 
-  const createGraph = () => {
-    const state = createAgentState();
+  const text = extractLastUserText(s);
+  const view = getCurrentView();
 
-    async function infoNode(s: any) {
-      const text = extractLastUserText(s);
-      const view = getCurrentView();
+  if (!view?.map) {
+    return { outputMessage: "No map view is currently available." };
+  }
 
-      if (!view?.map) {
-        return { outputMessage: "No map view is currently available." };
-      }
+  // ── Quick layer order / list ──────────────────────────────────────
+  if (/\b(layer\s*order|draw\s*order|stacking|what\s*layers|list\s*layers|layers?\s*on\s*the\s*map)\b/i.test(text)) {
+    const layers = view.map.layers.toArray();
+    if (layers.length === 0) {
+      return { outputMessage: "No layers on the map." };
+    }
+    // #1 = bottom layer (first in array), highest number = top
+    const lines = layers.map((l: any, i: number) =>
+      `${i + 1}. ${l.title || "Untitled"} _(${l.type})_`
+    );
+    return {
+      outputMessage:
+        `**Layer order** (bottom → top):\n\n${lines.join("\n")}\n\n` +
+        `${layers.length} layer${layers.length > 1 ? "s" : ""} total.`,
+    };
+  }
 
-      // ── Quick layer order / list ──────────────────────────────────────
-      if (/\b(layer\s*order|draw\s*order|stacking|what\s*layers|list\s*layers|layers?\s*on\s*the\s*map)\b/i.test(text)) {
-        const layers = view.map.layers.toArray();
-        if (layers.length === 0) {
-          return { outputMessage: "No layers on the map." };
-        }
-        // #1 = bottom layer (first in array), highest number = top
-        const lines = layers.map((l: any, i: number) =>
-          `${i + 1}. ${l.title || "Untitled"} _(${l.type})_`
-        );
-        return {
-          outputMessage:
-            `**Layer order** (bottom → top):\n\n${lines.join("\n")}\n\n` +
-            `${layers.length} layer${layers.length > 1 ? "s" : ""} total.`,
-        };
-      }
+  // ── Bail out: PointCloudAgent territory ──
+  if (/\b(class[\s_-]?code|classification|color\s*by|point\s*size|point\s*density|points?\s*per\s*inch|return[\s_-]?number)\b/i.test(text) ||
+      (/\bfilter\b/i.test(text) && /\b(class|elevation|intensity|return|ground|vegetation|building|water|noise)\b/i.test(text))) {
+    console.log("[LayerInfo] Skipping — PointCloudAgent territory.");
+    return { outputMessage: "" };
+  }
 
-      // ── Bail out: PointCloudAgent territory ──
-      if (/\b(class[\s_-]?code|classification|color\s*by|point\s*size|point\s*density|points?\s*per\s*inch|return[\s_-]?number)\b/i.test(text) ||
-          (/\bfilter\b/i.test(text) && /\b(class|elevation|intensity|return|ground|vegetation|building|water|noise)\b/i.test(text))) {
-        console.log("[LayerInfo] Skipping — PointCloudAgent territory.");
-        return { outputMessage: "" };
-      }
-
-      // ── Create/configure popup with specific fields ──
-      if (/\b(create|add|set|configure|enable|make)\b.*\bpop\s*up\b/i.test(text) ||
-          /\bpop\s*up\b.*\b(with|using|for|fields?|showing)\b/i.test(text)) {
-        const layers = view.map.layers.toArray();
-        if (layers.length === 0) {
-          return { outputMessage: "No layers on the map. Add a layer first." };
-        }
-
-        // Extract field names from the request
-        const fieldMatch = text.match(/(?:fields?|with|:)\s*[:.]?\s*(.+)/i);
-        let fieldNames: string[] = [];
-        if (fieldMatch) {
-          fieldNames = fieldMatch[1]
-            .split(/[,\s]+/)
-            .map((f: string) => f.trim())
-            .filter((f: string) => f.length > 0 && !/^(and|the|for|layer|popup|pop|up)$/i.test(f));
-        }
-
-        // Find the target layer — try to extract name, default to topmost
-        const layerHint = text
-          .replace(/\b(create|add|set|configure|enable|make|pop\s*up|popup|with|fields?|using|for|showing|layer)\b/gi, "")
-          .replace(/[:.,!?]/g, "")
-          .replace(fieldNames.join("|"), "")
-          .trim();
-
-        let targetLayer: any = layerHint.length > 1
-          ? findLayerByTitle(layers, layerHint)
-          : null;
-        if (!targetLayer) {
-          targetLayer = layers[layers.length - 1]; // topmost layer
-        }
-
-        // Layer type determines popup approach:
-        // - Imagery layers → redirect to ImageryAnalysisAgent (pixel identify)
-        // - Mesh/splat layers → no attributes, popups not supported
-        // - Feature-based, scene, point cloud → field-based PopupTemplate
-        const NO_POPUP_TYPES = new Set([
-          "integrated-mesh", "integrated-mesh-3dtiles", "gaussian-splat",
-          "elevation", "tile", "vector-tile", "web-tile",
-          "open-street-map", "bing-maps", "media", "group",
-          "dimension", "voxel",
-        ]);
-        const IMAGERY_TYPES = new Set(["imagery", "imagery-tile"]);
-
-        if (IMAGERY_TYPES.has(targetLayer.type)) {
-          // For imagery layers, enable click-to-identify pixel values directly
-          const imgView = getCurrentView() as any;
-          if (imgView) {
-            const { identifyPixel } = await import("../../utils/rasterFunctions");
-            // Remove any existing click handler
-            if ((window as any).__imgIdentifyRemove) {
-              (window as any).__imgIdentifyRemove();
-            }
-            // Disable default popup so our custom identify popup works
-            imgView.popupEnabled = false;
-            const handler = imgView.on("click", async (event: any) => {
-              event.stopPropagation();
-              const result = await identifyPixel(targetLayer as any, event.mapPoint, imgView);
-              if (!result) return;
-              imgView.openPopup({
-                title: result.layerTitle,
-                content: `Pixel values: ${result.values.join(", ")}<br>Location: ${result.location.longitude.toFixed(5)}, ${result.location.latitude.toFixed(5)}`,
-                location: event.mapPoint,
-              });
-            });
-            (window as any).__imgIdentifyRemove = () => {
-              handler.remove();
-              imgView.popupEnabled = true;
-            };
-            return {
-              outputMessage: `Click-to-identify enabled on "${targetLayer.title}". Click any location to see pixel/band values.`,
-            };
-          }
-          return {
-            outputMessage: `"${targetLayer.title}" is an imagery layer. Say **"identify"** to click and see pixel values.`,
-          };
-        }
-
-        if (NO_POPUP_TYPES.has(targetLayer.type)) {
-          return {
-            outputMessage: `"${targetLayer.title}" (type: ${targetLayer.type}) does not support attribute popups.`,
-          };
-        }
-
-        // Ensure layer is loaded so fields are available
-        try { await withTimeout(targetLayer.load(), 30000, `Load "${targetLayer.title}"`); } catch { /* continue */ }
-
-        // If no fields specified, use all available fields
-        if (fieldNames.length === 0 && targetLayer.fields) {
-          fieldNames = targetLayer.fields
-            .filter((f: any) => f.type !== "oid" && f.type !== "global-id" && f.type !== "geometry")
-            .map((f: any) => f.name);
-        }
-
-        // Point cloud layers have embedded attributes (ClassCode, Elevation, Intensity, etc.)
-        // exposed via layer.fields after load. Auto-populate all available fields.
-        if (targetLayer.type === "point-cloud" && fieldNames.length === 0) {
-          if (targetLayer.fields && targetLayer.fields.length > 0) {
-            fieldNames = targetLayer.fields.map((f: any) => f.name);
-          } else {
-            // Fallback: common point cloud attributes
-            fieldNames = ["CLASS_CODE", "ELEVATION", "INTENSITY", "NUMBER_OF_RETURNS", "RETURN_NUMBER", "RGB"];
-          }
-        }
-
-        if (fieldNames.length === 0) {
-          return {
-            outputMessage: `"${targetLayer.title}" has no attribute fields available for a popup. ` +
-              `This layer type may not support field-based popups.`,
-          };
-        }
-
-        // Build popup template
-        const PopupTemplate = (await import("@arcgis/core/PopupTemplate")).default;
-        const fieldInfos = fieldNames.map((name: string) => ({
-          fieldName: name,
-          label: name,
-          visible: true,
-        }));
-
-        targetLayer.popupTemplate = new PopupTemplate({
-          title: targetLayer.title ?? "Feature",
-          content: [{
-            type: "fields",
-            fieldInfos,
-          }],
-        });
-        targetLayer.popupEnabled = true;
-
-        return {
-          outputMessage: `Popup configured for "${targetLayer.title}" with ${fieldNames.length} fields: ${fieldNames.join(", ")}`,
-        };
-      }
-
-      // ── Raster statistics query ──
-      if (wantsStatistics(text)) {
-        // Extract layer name hint — strip statistics keywords
-        const statsHint = text
-          .replace(
-            /\b(what|is|are|the|lowest|highest|minimum|maximum|min|max|average|mean|std\s*dev|standard\s*deviation|statistics|stats|range|elevation|value|pixel|of|in|for|on|show|tell|me|about|get|compute|calculate)\b/gi,
-            ""
-          )
-          .replace(/[?.,!]/g, "")
-          .trim();
-
-        const mapLayers = view.map.layers?.toArray?.() ?? [];
-        const groundLayers = view.map.ground?.layers?.toArray?.() ?? [];
-        const allLayers = [...mapLayers, ...groundLayers];
-
-        // Find the target layer
-        let targetLayer = statsHint.length > 1
-          ? findAnyLayerByHint(view, statsHint)
-          : null;
-
-        // Fallback: find any imagery/elevation layer
-        if (!targetLayer) {
-          targetLayer = allLayers.find((l: any) =>
-            /^(imagery|imagery-tile|elevation)$/.test(l.type)
-          );
-        }
-
-        if (!targetLayer) {
-          return {
-            outputMessage: "No imagery or elevation layer found on the map to compute statistics for.",
-          };
-        }
-
-        const serviceUrl = getImageServiceUrl(targetLayer);
-        if (!serviceUrl) {
-          return {
-            outputMessage: `"${targetLayer.title}" is not an Image Service — statistics are only available for imagery and elevation layers.`,
-          };
-        }
-
-        try {
-          const stats = await fetchRasterStatistics(serviceUrl);
-          if (stats.length === 0) {
-            return {
-              outputMessage: `No statistics available for "${targetLayer.title}". The service may not support statistics computation.`,
-            };
-          }
-          return { outputMessage: formatStats(stats, targetLayer.title || "Untitled") };
-        } catch (err: any) {
-          return {
-            outputMessage: `Failed to compute statistics for "${targetLayer.title}": ${err.message}`,
-          };
-        }
-      }
-
-      const layers = view.map.layers.toArray();
-      if (layers.length === 0) {
-        return {
-          outputMessage:
-            "There are no layers on the map yet. Add a layer first, then ask me about it.",
-        };
-      }
-
-      // ── Determine which layer(s) to describe ──
-      const lower = text.toLowerCase();
-
-      // "all layers" or generic info request → summarize all
-      const wantsAll =
-        /\ball\s*(layers|data)\b/i.test(text) ||
-        /\bwhat('?s| is)\s*(on|in)\s*(the\s+)?(map|view)\b/i.test(text) ||
-        /\blist\s*(all\s*)?(layers|data)\b/i.test(text);
-
-      let targetLayers: any[];
-
-      if (wantsAll) {
-        targetLayers = layers;
-      } else {
-        // Check for numeric layer reference: "describe layer 4", "info on layer 2"
-        const numMatch = text.match(/\blayer\s*#?\s*(\d+)\b/i);
-        if (numMatch) {
-          const idx = parseInt(numMatch[1], 10) - 1; // 1-based → 0-based
-          if (idx >= 0 && idx < layers.length) {
-            targetLayers = [layers[idx]];
-          } else {
-            return {
-              outputMessage: `Layer ${numMatch[1]} does not exist. There are ${layers.length} layers on the map.`,
-            };
-          }
-        } else {
-          // Try to extract a layer name from the user text
-          const stripped = lower
-            .replace(
-              /\b(tell|me|about|show|info|information|details|describe|query|what|are|the|fields|attributes|metadata|popup|for|of|on|in|layer|table|tables|data|get|list|properties)\b/gi,
-              ""
-            )
-            .trim();
-
-          const matched = stripped.length > 1 ? findLayerByTitle(layers, stripped) : null;
-
-          if (matched) {
-            targetLayers = [matched];
-          } else if (layers.length === 1) {
-            // Only one layer — describe it
-            targetLayers = layers;
-          } else {
-            // Default: summarize all layers
-            targetLayers = layers;
-          }
-        }
-      }
-
-      // ── Build summaries ──
-      const summaries: string[] = [];
-      for (const layer of targetLayers) {
-        try {
-          const summary = await summarizeLayer(layer);
-          summaries.push(formatSummary(summary));
-        } catch (err: any) {
-          summaries.push(`### ${layer.title || "Untitled"}\n_Error loading info: ${err.message}_`);
-        }
-      }
-
-      const header =
-        targetLayers.length === 1
-          ? `Layer information for **${targetLayers[0].title || "Untitled"}**:\n`
-          : `Found **${targetLayers.length} layers** on the map:\n`;
-
-      return { outputMessage: header + "\n" + summaries.join("\n\n---\n\n") };
+  // ── Create/configure popup with specific fields ──
+  if (/\b(create|add|set|configure|enable|make)\b.*\bpop\s*up\b/i.test(text) ||
+      /\bpop\s*up\b.*\b(with|using|for|fields?|showing)\b/i.test(text)) {
+    const layers = view.map.layers.toArray();
+    if (layers.length === 0) {
+      return { outputMessage: "No layers on the map. Add a layer first." };
     }
 
-    return new StateGraph(state)
-      .addNode("infoNode", infoNode)
-      .addEdge(START, "infoNode")
-      .addEdge("infoNode", END);
-  };
+    // Extract field names from the request
+    const fieldMatch = text.match(/(?:fields?|with|:)\s*[:.]?\s*(.+)/i);
+    let fieldNames: string[] = [];
+    if (fieldMatch) {
+      fieldNames = fieldMatch[1]
+        .split(/[,\s]+/)
+        .map((f: string) => f.trim())
+        .filter((f: string) => f.length > 0 && !/^(and|the|for|layer|popup|pop|up)$/i.test(f));
+    }
 
-  registerAgentElement(assistant, {
-    id: agentId,
-    name: "Layer Info",
-    description:
-      "Query layers for detailed information including fields, attributes, popup configuration, " +
-      "metadata, tables, sublayers, capabilities, spatial reference, extent, and processing templates. " +
-      "Also computes raster statistics (min, max, mean, standard deviation) for imagery and elevation layers. " +
-      "Handles 'what is the layer order', 'list layers', 'describe layer 4', 'describe [layer name]'. " +
-      "Use when the user asks about layer properties, attributes, fields, schema, popup info, " +
-      "metadata, what data a layer contains, available tables, layer order, draw order, or raster/elevation statistics. " +
-      "Keywords: fields, attributes, columns, schema, popup, metadata, tables, info, describe, " +
-      "properties, capabilities, band count, pixel type, processing templates, sublayers, " +
-      "layer order, draw order, what layers, list layers, describe layer, " +
-      "statistics, stats, minimum, maximum, lowest, highest, average, mean, elevation value, pixel range.",
-    createGraph,
-  });
+    // Find the target layer — try to extract name, default to topmost
+    const layerHint = text
+      .replace(/\b(create|add|set|configure|enable|make|pop\s*up|popup|with|fields?|using|for|showing|layer)\b/gi, "")
+      .replace(/[:.,!?]/g, "")
+      .replace(fieldNames.join("|"), "")
+      .trim();
+
+    let targetLayer: any = layerHint.length > 1
+      ? findLayerByTitle(layers, layerHint)
+      : null;
+    if (!targetLayer) {
+      targetLayer = layers[layers.length - 1]; // topmost layer
+    }
+
+    // Layer type determines popup approach:
+    // - Imagery layers → redirect to ImageryAnalysisAgent (pixel identify)
+    // - Mesh/splat layers → no attributes, popups not supported
+    // - Feature-based, scene, point cloud → field-based PopupTemplate
+    const NO_POPUP_TYPES = new Set([
+      "integrated-mesh", "integrated-mesh-3dtiles", "gaussian-splat",
+      "elevation", "tile", "vector-tile", "web-tile",
+      "open-street-map", "bing-maps", "media", "group",
+      "dimension", "voxel",
+    ]);
+    const IMAGERY_TYPES = new Set(["imagery", "imagery-tile"]);
+
+    if (IMAGERY_TYPES.has(targetLayer.type)) {
+      // For imagery layers, enable click-to-identify pixel values directly
+      const imgView = getCurrentView() as any;
+      if (imgView) {
+        const { identifyPixel } = await import("../../utils/rasterFunctions");
+        // Remove any existing click handler
+        if ((window as any).__imgIdentifyRemove) {
+          (window as any).__imgIdentifyRemove();
+        }
+        // Disable default popup so our custom identify popup works
+        imgView.popupEnabled = false;
+        const handler = imgView.on("click", async (event: any) => {
+          event.stopPropagation();
+          const result = await identifyPixel(targetLayer as any, event.mapPoint, imgView);
+          if (!result) return;
+          imgView.openPopup({
+            title: result.layerTitle,
+            content: `Pixel values: ${result.values.join(", ")}<br>Location: ${result.location.longitude.toFixed(5)}, ${result.location.latitude.toFixed(5)}`,
+            location: event.mapPoint,
+          });
+        });
+        (window as any).__imgIdentifyRemove = () => {
+          handler.remove();
+          imgView.popupEnabled = true;
+        };
+        return {
+          outputMessage: `Click-to-identify enabled on "${targetLayer.title}". Click any location to see pixel/band values.`,
+        };
+      }
+      return {
+        outputMessage: `"${targetLayer.title}" is an imagery layer. Say **"identify"** to click and see pixel values.`,
+      };
+    }
+
+    if (NO_POPUP_TYPES.has(targetLayer.type)) {
+      return {
+        outputMessage: `"${targetLayer.title}" (type: ${targetLayer.type}) does not support attribute popups.`,
+      };
+    }
+
+    // Ensure layer is loaded so fields are available
+    try { await withTimeout(targetLayer.load(), 30000, `Load "${targetLayer.title}"`); } catch { /* continue */ }
+
+    // If no fields specified, use all available fields
+    if (fieldNames.length === 0 && targetLayer.fields) {
+      fieldNames = targetLayer.fields
+        .filter((f: any) => f.type !== "oid" && f.type !== "global-id" && f.type !== "geometry")
+        .map((f: any) => f.name);
+    }
+
+    // Point cloud layers have embedded attributes (ClassCode, Elevation, Intensity, etc.)
+    // exposed via layer.fields after load. Auto-populate all available fields.
+    if (targetLayer.type === "point-cloud" && fieldNames.length === 0) {
+      if (targetLayer.fields && targetLayer.fields.length > 0) {
+        fieldNames = targetLayer.fields.map((f: any) => f.name);
+      } else {
+        // Fallback: common point cloud attributes
+        fieldNames = ["CLASS_CODE", "ELEVATION", "INTENSITY", "NUMBER_OF_RETURNS", "RETURN_NUMBER", "RGB"];
+      }
+    }
+
+    if (fieldNames.length === 0) {
+      return {
+        outputMessage: `"${targetLayer.title}" has no attribute fields available for a popup. ` +
+          `This layer type may not support field-based popups.`,
+      };
+    }
+
+    // Build popup template
+    const PopupTemplate = (await import("@arcgis/core/PopupTemplate")).default;
+    const fieldInfos = fieldNames.map((name: string) => ({
+      fieldName: name,
+      label: name,
+      visible: true,
+    }));
+
+    targetLayer.popupTemplate = new PopupTemplate({
+      title: targetLayer.title ?? "Feature",
+      content: [{
+        type: "fields",
+        fieldInfos,
+      }],
+    });
+    targetLayer.popupEnabled = true;
+
+    return {
+      outputMessage: `Popup configured for "${targetLayer.title}" with ${fieldNames.length} fields: ${fieldNames.join(", ")}`,
+    };
+  }
+
+  // ── Raster statistics query ──
+  if (wantsStatistics(text)) {
+    // Extract layer name hint — strip statistics keywords
+    const statsHint = text
+      .replace(
+        /\b(what|is|are|the|lowest|highest|minimum|maximum|min|max|average|mean|std\s*dev|standard\s*deviation|statistics|stats|range|elevation|value|pixel|of|in|for|on|show|tell|me|about|get|compute|calculate)\b/gi,
+        ""
+      )
+      .replace(/[?.,!]/g, "")
+      .trim();
+
+    const mapLayers = view.map.layers?.toArray?.() ?? [];
+    const groundLayers = view.map.ground?.layers?.toArray?.() ?? [];
+    const allLayers = [...mapLayers, ...groundLayers];
+
+    // Find the target layer
+    let targetLayer = statsHint.length > 1
+      ? findAnyLayerByHint(view, statsHint)
+      : null;
+
+    // Fallback: find any imagery/elevation layer
+    if (!targetLayer) {
+      targetLayer = allLayers.find((l: any) =>
+        /^(imagery|imagery-tile|elevation)$/.test(l.type)
+      );
+    }
+
+    if (!targetLayer) {
+      return {
+        outputMessage: "No imagery or elevation layer found on the map to compute statistics for.",
+      };
+    }
+
+    const serviceUrl = getImageServiceUrl(targetLayer);
+    if (!serviceUrl) {
+      return {
+        outputMessage: `"${targetLayer.title}" is not an Image Service — statistics are only available for imagery and elevation layers.`,
+      };
+    }
+
+    try {
+      const stats = await fetchRasterStatistics(serviceUrl);
+      if (stats.length === 0) {
+        return {
+          outputMessage: `No statistics available for "${targetLayer.title}". The service may not support statistics computation.`,
+        };
+      }
+      return { outputMessage: formatStats(stats, targetLayer.title || "Untitled") };
+    } catch (err: any) {
+      return {
+        outputMessage: `Failed to compute statistics for "${targetLayer.title}": ${err.message}`,
+      };
+    }
+  }
+
+  const layers = view.map.layers.toArray();
+  if (layers.length === 0) {
+    return {
+      outputMessage:
+        "There are no layers on the map yet. Add a layer first, then ask me about it.",
+    };
+  }
+
+  // ── Determine which layer(s) to describe ──
+  const lower = text.toLowerCase();
+
+  // "all layers" or generic info request → summarize all
+  const wantsAll =
+    /\ball\s*(layers|data)\b/i.test(text) ||
+    /\bwhat('?s| is)\s*(on|in)\s*(the\s+)?(map|view)\b/i.test(text) ||
+    /\blist\s*(all\s*)?(layers|data)\b/i.test(text);
+
+  let targetLayers: any[];
+
+  if (wantsAll) {
+    targetLayers = layers;
+  } else {
+    // Check for numeric layer reference: "describe layer 4", "info on layer 2"
+    const numMatch = text.match(/\blayer\s*#?\s*(\d+)\b/i);
+    if (numMatch) {
+      const idx = parseInt(numMatch[1], 10) - 1; // 1-based → 0-based
+      if (idx >= 0 && idx < layers.length) {
+        targetLayers = [layers[idx]];
+      } else {
+        return {
+          outputMessage: `Layer ${numMatch[1]} does not exist. There are ${layers.length} layers on the map.`,
+        };
+      }
+    } else {
+      // Try to extract a layer name from the user text
+      const stripped = lower
+        .replace(
+          /\b(tell|me|about|show|info|information|details|describe|query|what|are|the|fields|attributes|metadata|popup|for|of|on|in|layer|table|tables|data|get|list|properties)\b/gi,
+          ""
+        )
+        .trim();
+
+      const matched = stripped.length > 1 ? findLayerByTitle(layers, stripped) : null;
+
+      if (matched) {
+        targetLayers = [matched];
+      } else if (layers.length === 1) {
+        // Only one layer — describe it
+        targetLayers = layers;
+      } else {
+        // Default: summarize all layers
+        targetLayers = layers;
+      }
+    }
+  }
+
+  // ── Build summaries ──
+  const summaries: string[] = [];
+  for (const layer of targetLayers) {
+    try {
+      const summary = await summarizeLayer(layer);
+      summaries.push(formatSummary(summary));
+    } catch (err: any) {
+      summaries.push(`### ${layer.title || "Untitled"}\n_Error loading info: ${err.message}_`);
+    }
+  }
+
+  const header =
+    targetLayers.length === 1
+      ? `Layer information for **${targetLayers[0].title || "Untitled"}**:\n`
+      : `Found **${targetLayers.length} layers** on the map:\n`;
+
+  return { outputMessage: header + "\n" + summaries.join("\n\n---\n\n") };
 }
+
+// ── Graph builder ───────────────────────────────────────────────────────────
+
+const createLayerInfoGraph = () =>
+  new StateGraph(LayerInfoState)
+    .addNode("infoNode", infoNode)
+    .addEdge(START, "infoNode")
+    .addEdge("infoNode", END);
+
+// ── Agent registration ──────────────────────────────────────────────────────
+
+export const LayerInfoAgent: AgentRegistration = {
+  id: "layer-info-agent",
+  name: "Layer Info",
+  description:
+    "Query layers for detailed information including fields, attributes, popup configuration, " +
+    "metadata, tables, sublayers, capabilities, spatial reference, extent, and processing templates. " +
+    "Also computes raster statistics (min, max, mean, standard deviation) for imagery and elevation layers. " +
+    "Handles 'what is the layer order', 'list layers', 'describe layer 4', 'describe [layer name]'. " +
+    "Use when the user asks about layer properties, attributes, fields, schema, popup info, " +
+    "metadata, what data a layer contains, available tables, layer order, draw order, or raster/elevation statistics. " +
+    "Keywords: fields, attributes, columns, schema, popup, metadata, tables, info, describe, " +
+    "properties, capabilities, band count, pixel type, processing templates, sublayers, " +
+    "layer order, draw order, what layers, list layers, describe layer, " +
+    "statistics, stats, minimum, maximum, lowest, highest, average, mean, elevation value, pixel range.",
+  createGraph: createLayerInfoGraph,
+  workspace: LayerInfoState,
+};

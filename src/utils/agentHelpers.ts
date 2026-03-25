@@ -1,6 +1,3 @@
-import {
-  Annotation as ANNOTATION,
-} from "@langchain/langgraph/web";
 
 // ── Debug logging ───────────────────────────────────────────────────────────
 
@@ -166,45 +163,6 @@ export function findLayerByTitle(layers: any[], query: string): any | null {
   return null;
 }
 
-// ── Agent state & registration ──────────────────────────────────────────────
-
-/**
- * Create the standard agent state annotation with messages + outputMessage.
- */
-export function createAgentState() {
-  return ANNOTATION.Root({
-    messages: ANNOTATION({
-      reducer: (cur: any[] = [], update: any) => [...cur, update],
-      default: () => [],
-    }),
-    outputMessage: ANNOTATION({
-      reducer: (current: string = "", update: any) =>
-        typeof update === "string" && update.trim()
-          ? current
-            ? `${current}\n\n${update}`
-            : update
-          : current,
-      default: () => "",
-    }),
-  });
-}
-
-/**
- * Register an agent element on the arcgis-assistant DOM element.
- * Removes any existing agent with the same ID before adding.
- */
-export function registerAgentElement(
-  assistant: HTMLElement,
-  agent: { id: string; name: string; description: string; createGraph: () => any; workspace?: any }
-): void {
-  const existing = assistant.querySelector(`[data-agent-id="${agent.id}"]`);
-  if (existing) existing.remove();
-
-  const agentEl = document.createElement("arcgis-assistant-agent") as any;
-  agentEl.setAttribute("data-agent-id", agent.id);
-  agentEl.agent = agent;
-  assistant.appendChild(agentEl);
-}
 
 /** Format elapsed time from a performance.now() start timestamp. */
 export function elapsed(startMs: number): string {
