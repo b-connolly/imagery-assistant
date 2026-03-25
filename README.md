@@ -26,7 +26,7 @@ This app has been developed with the assistance of AI coding agents. Review the 
 - Compare layers side-by-side with a swipe tool.
 - Query layer metadata, fields, statistics, and service capabilities.
 - Adjust elevation offsets for 3D layers (auto-fix, click-to-fix, or manual).
-- Visualize and filter LiDAR point clouds by classification, color, and density.
+- Visualize and filter point clouds by classification, color, and density.
 - View oriented imagery with coverage footprints and image galleries.
 
 ## Custom Agents
@@ -38,7 +38,7 @@ This app relies heavily on custom agent development following this [resource](ht
 | **ContentSearchAgent** | Discovery | Searches ArcGIS Online for imagery, elevation, and geospatial content with smart filtering |
 | **LoadLayerAgent** | Discovery | Loads layers by URL or item ID — supports Feature, Imagery, Scene, Tile, WMS, and elevation services |
 | **ImageryToolsAgent** | Visualization | Applies stretches, color ramps, server-side processing templates, and pixel identification |
-| **PointCloudAgent** | Visualization | Controls LiDAR point cloud styling — classification filtering, color by elevation/intensity/RGB |
+| **PointCloudAgent** | Visualization | Controls point cloud layer styling — classification filtering, color by elevation/intensity/RGB |
 | **OrientedImageryAgent** | Visualization | Opens the Oriented Imagery viewer for street-level and oblique imagery |
 | **CatalogLayerAgent** | Visualization | Interactive filtering for items in Catalog Layers by layer type |
 | **SwipeAgent** | Analysis | Enables layer comparison with a leading/trailing swipe tool |
