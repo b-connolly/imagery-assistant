@@ -266,7 +266,7 @@ without writing code or navigating complex menus.
 <h3>Core Capabilities at a Glance</h3>
 <ul>
   <li><strong>Content Search &amp; Discovery</strong> &mdash; Search My Content, My Org, ArcGIS Online, or Living Atlas for layers by keyword</li>
-  <li><strong>Layer Loading</strong> &mdash; Load any ArcGIS-supported layer type from a URL, item ID, or keyword search</li>
+  <li><strong>Layer Loading &amp; Navigation</strong> &mdash; Load any ArcGIS-supported layer type from a URL, item ID, or keyword search. Navigate to places by name via geocoding (works in 2D and 3D)</li>
   <li><strong>Imagery Tools</strong> &mdash; Apply stretches, color ramps, server-side processing templates, and identify pixel values</li>
   <li><strong>Layer Comparison</strong> &mdash; Swipe between two layers to compare them side by side</li>
   <li><strong>Point Cloud Visualization</strong> &mdash; Filter LiDAR by classification, color by elevation/intensity/RGB</li>
@@ -275,7 +275,7 @@ without writing code or navigating complex menus.
   <li><strong>Oriented Imagery</strong> &mdash; View street-level and oblique imagery with coverage footprints</li>
   <li><strong>Catalog Layers</strong> &mdash; Browse and filter items in catalog layer collections</li>
   <li><strong>Layer Info</strong> &mdash; Inspect metadata, fields, statistics, and layer order</li>
-  <li><strong>Navigation &amp; Help</strong> &mdash; Zoom to locations, change basemaps, get contextual help</li>
+  <li><strong>Help</strong> &mdash; Contextual help and capabilities overview</li>
 </ul>
 
 <!-- ════════════════════════════════════════════════ ARCHITECTURE -->
@@ -298,8 +298,8 @@ without writing code or navigating complex menus.
 <span class="dim">│</span>  ┌──────────────────────┐   │  │ <span class="green">Content Search</span>  │ <span class="green">Load Layer</span>  │ │ <span class="dim">│</span>
 <span class="dim">│</span>  │ Built-in:            │   │  │ <span class="green">Imagery Tools</span>  │ <span class="green">Measurement</span> │ │ <span class="dim">│</span>
 <span class="dim">│</span>  │  • Help               │   │  │ <span class="green">Elev. Offset</span>   │ <span class="green">Swipe</span>       │ │ <span class="dim">│</span>
-<span class="dim">│</span>  │  • Navigation         │   │  │ <span class="green">Point Cloud</span>    │ <span class="green">Layer Info</span>  │ │ <span class="dim">│</span>
-<span class="dim">│</span>  │  • Data Exploration   │   │  │ <span class="green">Oriented Img</span>   │ <span class="green">Catalog Lyr</span> │ │ <span class="dim">│</span>
+<span class="dim">│</span>  │  • Data Exploration   │   │  │ <span class="green">Point Cloud</span>    │ <span class="green">Layer Info</span>  │ │ <span class="dim">│</span>
+<span class="dim">│</span>  │    (2D only)          │   │  │ <span class="green">Oriented Img</span>   │ <span class="green">Catalog Lyr</span> │ │ <span class="dim">│</span>
 <span class="dim">│</span>  └──────────────────────┘   │  └────────────────────────────────┘ │ <span class="dim">│</span>
 <span class="dim">│</span>                              └──────────────────────────────────────┘ <span class="dim">│</span>
 <span class="dim">│</span>                                                                     <span class="dim">│</span>
@@ -361,7 +361,7 @@ without writing code or navigating complex menus.
 <!-- ════════════════════════════════════════════════ AGENTS -->
 <h2 id="agents" class="page-break">4. Agent Capabilities</h2>
 
-<p>The assistant includes <strong>13 agents</strong> &mdash; 3 built-in ArcGIS agents and 10 custom agents.
+<p>The assistant includes <strong>12 agents</strong> &mdash; 2 built-in ArcGIS agents and 10 custom agents.
 The AI orchestrator selects the best agent for each user request based on the agent descriptions.</p>
 
 <!-- Built-in Agents -->
@@ -371,15 +371,15 @@ The AI orchestrator selects the best agent for each user request based on the ag
   Provides contextual guidance based on the current map state.</p>
 </div>
 
-<div class="agent-card">
-  <h3>Navigation Agent <span class="badge builtin">Built-in</span></h3>
-  <p>Handles map navigation commands: zoom to locations, change basemaps, adjust view extent,
-  go to coordinates, and manage camera position in 3D.</p>
+<div class="info-box amber">
+  <strong>Note:</strong> The built-in <code>arcgis-assistant-navigation-agent</code> has been removed because
+  it only supports 2D <code>arcgis-map</code> and crashes in 3D SceneView. Navigation (geocoding to places)
+  is handled by the custom <strong>Load Layer Agent</strong> instead, which works in both 2D and 3D.
 </div>
 
 <div class="agent-card">
   <h3>Data Exploration Agent <span class="badge builtin">Built-in</span></h3>
-  <p>Explores data attributes and statistics of layers loaded on the map. Supports filtering,
+  <p>Explores data attributes and statistics of layers loaded on the 2D map. Supports filtering,
   querying, and summarizing feature attributes.</p>
 </div>
 
@@ -412,7 +412,8 @@ The AI orchestrator selects the best agent for each user request based on the ag
 
 <div class="agent-card">
   <h3>Load Layer Agent <span class="badge custom">Custom</span></h3>
-  <p>Loads any ArcGIS-supported layer type onto the map from a URL, portal item ID, or keyword search.</p>
+  <p>Loads any ArcGIS-supported layer type onto the map from a URL, portal item ID, or keyword search.
+  Also handles navigation to places via geocoding (works in both 2D and 3D).</p>
   <h4>Supported Layer Types</h4>
   <p>Imagery, Feature, Tile, Map Image, Scene, Integrated Mesh, 3D Tiles, Gaussian Splat,
   Point Cloud, Building Scene, Oriented Imagery, WMS, WFS, WMTS, KML, GeoJSON, CSV, Vector Tile</p>
@@ -422,12 +423,14 @@ The AI orchestrator selects the best agent for each user request based on the ag
     <li>Automatically switches to 3D view when loading 3D-only layers</li>
     <li>Supports elevation offset on load (e.g., <span class="prompt">load mesh with 50m offset</span>)</li>
     <li>Auto-zooms to the loaded layer's extent</li>
+    <li>Geocodes place names using ArcGIS World Geocoding Service (replaces built-in navigation agent which only supports 2D)</li>
   </ul>
   <h4>Example Prompts</h4>
   <ul>
     <li><span class="prompt">load world imagery</span></li>
     <li><span class="prompt">load https://services.arcgis.com/.../ImageServer</span></li>
-    <li><span class="prompt">show me the layer with ID a1b2c3d4...</span></li>
+    <li><span class="prompt">zoom to Denver CO</span></li>
+    <li><span class="prompt">go to Tokyo</span></li>
   </ul>
 </div>
 

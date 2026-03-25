@@ -21,6 +21,7 @@ This app has been developed with the assistance of AI coding agents. Review the 
 - Sign in with ArcGIS and work with 2D maps or 3D scenes.
 - Search your ArcGIS Online organization for imagery, elevation, and other content.
 - Load layers by URL, item ID, or natural-language search.
+- Navigate to places by name in 2D and 3D (geocoding via ArcGIS World Geocoding Service).
 - Perform measurements: distance, area, volume, and elevation profiles.
 - Run raster analysis with server-side processing templates and stretches.
 - Compare layers side-by-side with a swipe tool.
@@ -36,7 +37,7 @@ This app relies heavily on custom agent development following this [resource](ht
 | Agent | Group | Description |
 |---|---|---|
 | **ContentSearchAgent** | Discovery | Searches ArcGIS Online for imagery, elevation, and geospatial content with smart filtering |
-| **LoadLayerAgent** | Discovery | Loads layers by URL or item ID — supports Feature, Imagery, Scene, Tile, WMS, and elevation services |
+| **LoadLayerAgent** | Discovery | Loads layers by URL or item ID, navigates to places via geocoding — works in 2D and 3D |
 | **ImageryToolsAgent** | Visualization | Applies stretches, color ramps, server-side processing templates, and pixel identification |
 | **PointCloudAgent** | Visualization | Controls LiDAR point cloud styling — classification filtering, color by elevation/intensity/RGB |
 | **OrientedImageryAgent** | Visualization | Opens the Oriented Imagery viewer for street-level and oblique imagery |
@@ -100,6 +101,11 @@ Example prompts:
 - `load this layer: https://services.arcgis.com/.../FeatureServer`
 - `add the layer with item id abc123`
 
+**Navigation**
+- `zoom to Denver CO`
+- `go to Tokyo`
+- `fly to the Grand Canyon`
+
 **Elevation & terrain**
 - `load this as a terrain surface: https://tiles.arcgis.com/.../ImageServer`
 - `adjust the elevation offset for the drone imagery layer`
@@ -133,6 +139,12 @@ Example prompts:
 - [LangGraph (Web)](https://www.npmjs.com/package/@langchain/langgraph)
 - [React 18](https://react.dev/) + [Vite 7](https://vite.dev/)
 - [TypeScript](https://www.typescriptlang.org/)
+
+## Known Limitations
+
+- **Built-in navigation agent removed** — The `arcgis-assistant-navigation-agent` only supports 2D (`arcgis-map`) and crashes in 3D SceneView (`Cannot read properties of null (reading 'bookmarks')`). Geocoding is handled by the custom `LoadLayerAgent` instead, which works in both 2D and 3D.
+- **Built-in data exploration agent** — Only supports 2D `arcgis-map` for querying feature layers. Does not work in 3D SceneView.
+- **React 18 custom element props** — React 18 does not pass object props to web components as properties (fixed in React 19). The `AgentElement` wrapper component handles this by setting the `agent` property imperatively via a ref.
 
 ## Troubleshooting
 
