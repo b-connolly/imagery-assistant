@@ -94,15 +94,11 @@ Example prompts:
 - `load this layer: https://services.arcgis.com/.../FeatureServer`
 - `add the layer with item id abc123`
 
-**Elevation & terrain**
-- `load this as a terrain surface: https://tiles.arcgis.com/.../ImageServer`
-- `adjust the elevation offset for the drone imagery layer`
-
 **Measurement**
 - `measure distance in kilometers`
 - `measure area in acres`
 - `show an elevation profile`
-- `measure volume using cut and fill`
+- `measure volume`
 
 **Imagery analysis**
 - `apply NDVI to the satellite imagery layer`
@@ -111,13 +107,13 @@ Example prompts:
 
 **Layer info & comparison**
 - `what fields does the oriented imagery layer have?`
-- `describe layer 4`
+- `describe layer`
 - `swipe between the two imagery layers`
 
 **3D & point cloud**
 - `fix the floating mesh`
 - `show only ground and buildings`
-- `color by elevation`
+- `change point cloud density to 100%`
 
 ## Tech Stack
 
