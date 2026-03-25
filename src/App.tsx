@@ -19,41 +19,25 @@ import {
   type ViewType,
 } from "./utils/viewManager";
 import ViewToggle from "./components/ViewToggle";
+import AgentElement from "./components/AgentElement";
 // discovery
-import { registerContentSearchAgent } from "./agents/discovery/ContentSearchAgent";
-import { registerLoadLayerAgent } from "./agents/discovery/LoadLayerAgent";
+import { ContentSearchAgent } from "./agents/discovery/ContentSearchAgent";
+import { LoadLayerAgent } from "./agents/discovery/LoadLayerAgent";
 // visualization
-import { registerImageryToolsAgent } from "./agents/visualization/ImageryToolsAgent";
-import { registerPointCloudAgent } from "./agents/visualization/PointCloudAgent";
-import { registerOrientedImageryAgent } from "./agents/visualization/OrientedImageryAgent";
-import { registerCatalogLayerAgent } from "./agents/visualization/CatalogLayerAgent";
+import { ImageryToolsAgent } from "./agents/visualization/ImageryToolsAgent";
+import { PointCloudAgent } from "./agents/visualization/PointCloudAgent";
+import { OrientedImageryAgent } from "./agents/visualization/OrientedImageryAgent";
+import { CatalogLayerAgent } from "./agents/visualization/CatalogLayerAgent";
 // analysis
-import { registerSwipeAgent } from "./agents/analysis/SwipeAgent";
-import { registerLayerInfoAgent } from "./agents/analysis/LayerInfoAgent";
-import { registerMeasurementAgent } from "./agents/analysis/MeasurementAgent";
-import { registerElevationOffsetAgent } from "./agents/analysis/ElevationOffsetAgent";
+import { SwipeAgent } from "./agents/analysis/SwipeAgent";
+import { LayerInfoAgent } from "./agents/analysis/LayerInfoAgent";
+import { MeasurementAgent } from "./agents/analysis/MeasurementAgent";
+import { ElevationOffsetAgent } from "./agents/analysis/ElevationOffsetAgent";
 
 // Global default — zoomed out to show the full world
 const DEFAULT_CENTER = [0, 20];
 const DEFAULT_ZOOM = 1;
 
-/**
- * Pre-register custom agent elements into an arcgis-assistant element.
- * Must happen synchronously when the assistant element mounts,
- * BEFORE the orchestrator initializes and snapshots child agents.
- */
-function registerCustomAgents(assistant: HTMLElement) {
-  registerLoadLayerAgent(assistant);
-  registerImageryToolsAgent(assistant);
-  registerElevationOffsetAgent(assistant);
-  registerContentSearchAgent(assistant);
-  registerMeasurementAgent(assistant);
-  registerSwipeAgent(assistant);
-  registerLayerInfoAgent(assistant);
-  registerPointCloudAgent(assistant);
-  registerOrientedImageryAgent(assistant);
-  registerCatalogLayerAgent(assistant);
-}
 
 export default function App() {
   const [oauthReady, setOauthReady] = useState(false);
@@ -70,7 +54,6 @@ export default function App() {
   const assistantItemId = useRef<string | null>(null);
 
   // Track the assistant element to register agents exactly once per mount
-  const assistantRegistered = useRef(false);
 
   // Shared post-auth setup: load user profile and ensure assistant web map item
   const completeSignIn = useCallback(async () => {
@@ -452,19 +435,10 @@ export default function App() {
     });
   }, []);
 
-  // Ref callback: fires synchronously when the arcgis-assistant element mounts.
-  // This registers agents BEFORE the orchestrator reads child elements.
+  // Ref callback: listen for AI model errors (403 = org doesn't have AI Models license)
   const assistantRefCallback = useCallback(
     (el: HTMLElement | null) => {
-      if (!el) {
-        assistantRegistered.current = false;
-        return;
-      }
-      if (assistantRegistered.current) return;
-      assistantRegistered.current = true;
-      registerCustomAgents(el);
-
-      // Listen for AI model errors (403 = org doesn't have AI Models license)
+      if (!el) return;
       el.addEventListener("arcgisError", ((evt: CustomEvent) => {
         const msg = evt.detail?.message ?? evt.detail?.error?.message ?? String(evt.detail);
         console.error("[App] Assistant error:", msg);
@@ -627,8 +601,20 @@ export default function App() {
               heading="Imagery Data Assistant"
             >
               <arcgis-assistant-help-agent />
-              <arcgis-assistant-navigation-agent />
+              {/* Built-in navigation agent removed — only supports arcgis-map (2D),
+                  crashes on SceneView. LoadLayerAgent handles geocoding instead. */}
               <arcgis-assistant-data-exploration-agent />
+              {/* Custom agents — AgentElement sets the agent property imperatively (React 18 compat) */}
+              <AgentElement agent={ContentSearchAgent} />
+              <AgentElement agent={LoadLayerAgent} />
+              <AgentElement agent={ImageryToolsAgent} />
+              <AgentElement agent={PointCloudAgent} />
+              <AgentElement agent={OrientedImageryAgent} />
+              <AgentElement agent={CatalogLayerAgent} />
+              <AgentElement agent={SwipeAgent} />
+              <AgentElement agent={LayerInfoAgent} />
+              <AgentElement agent={MeasurementAgent} />
+              <AgentElement agent={ElevationOffsetAgent} />
             </arcgis-assistant>
           ) : (
             <div className="sign-in-panel">
