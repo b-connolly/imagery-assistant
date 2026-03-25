@@ -40,7 +40,7 @@ This app relies heavily on custom agent development following this [resource](ht
 | **ImageryToolsAgent** | Visualization | Applies stretches, color ramps, server-side processing templates, and pixel identification |
 | **PointCloudAgent** | Visualization | Controls LiDAR point cloud styling — classification filtering, color by elevation/intensity/RGB |
 | **OrientedImageryAgent** | Visualization | Opens the Oriented Imagery viewer for street-level and oblique imagery |
-| **CatalogLayerAgent** | Visualization | Interactive filter panel for browsing items in Catalog Layers by type |
+| **CatalogLayerAgent** | Visualization | Interactive filtering for items in Catalog Layers by layer type |
 | **SwipeAgent** | Analysis | Enables layer comparison with a leading/trailing swipe tool |
 | **LayerInfoAgent** | Analysis | Queries layer metadata, fields, statistics, layer order, and service capabilities |
 | **MeasurementAgent** | Analysis | Activates distance, area, volume, and elevation profile tools in 2D and 3D |
