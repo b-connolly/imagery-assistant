@@ -6,15 +6,9 @@ React + Vite app built with ArcGIS Maps SDK, ArcGIS AI Assistant components, and
 
 This project was inspired by and built upon the foundational work of [ralouta/ArcGIS-JavaScript-AI-Component](https://github.com/ralouta/ArcGIS-JavaScript-AI-Component). That project demonstrated how to integrate ArcGIS AI Assistant components with custom agents in a React application and served as the starting point for this imagery-focused extension.
 
-## Demo
-
-A live demo is hosted on AWS S3: **[Imagery Data Assistant Demo](https://esri-imagery-apps.s3.dualstack.us-west-1.amazonaws.com/apps/imagery-assistant/index.html)**
-
-Sign in with your ArcGIS Online account to explore the full capabilities — search for imagery and geospatial content, load layers from URLs or portal items, run raster analysis, perform 2D/3D measurements, and interact with your data through natural language. The demo reflects the latest build from this repository.
-
 ## Disclaimer
 
-This app has been developed with the assistance of AI coding agents. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is just for testing new AI Agent capabilities in ArcGIS Maps SDK for JS. Some features are not fully complete and there are limitations to phrasing at this time.
+This app has been vibe-coded with the assistance of Claude. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is just for testing new AI Agent capabilities in ArcGIS Maps SDK for JS and for testing new agent development and deployment for Imagery & 3D content.
 
 ## What It Does
 
@@ -28,6 +22,8 @@ This app has been developed with the assistance of AI coding agents. Review the 
 - Adjust elevation offsets for 3D layers.
 
 ## Custom Agents
+
+This app relies heavily on custom agent development following this [resource](https://developers.arcgis.com/javascript/latest/agentic-apps/ai-custom-agents/).
 
 | Agent | Description |
 |---|---|
