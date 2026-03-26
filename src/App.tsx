@@ -500,7 +500,7 @@ export default function App() {
               .replace("living-atlas", "ArcGIS Living Atlas")
               .replace("all", "All Sources")
           : "";
-        const searchAgainPrompt = scopeLabel ? `Search ${scopeLabel}` : "Search My Content";
+        const searchAgainPrompt = scopeLabel ? scopeLabel : "My Content";
         assistant.suggestedPrompts = [...resultPrompts, searchAgainPrompt];
       }) as EventListener);
       window.addEventListener("imagery-assistant-layers-added", ((evt: CustomEvent) => {

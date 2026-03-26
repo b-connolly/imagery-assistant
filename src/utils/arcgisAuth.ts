@@ -180,9 +180,16 @@ async function ensureEmbeddingsResource(
  * creates one if not found.
  */
 export async function ensureWebMapItem(): Promise<string> {
-  // If user provided one via env, use it directly
+  // If user provided one via env, ensure embeddings exist on it and return
   const envItemId = import.meta.env.VITE_WEBMAP_ITEM_ID;
-  if (envItemId) return envItemId;
+  if (envItemId) {
+    const portal = await getPortal();
+    if (portal.user) {
+      const credential = IdentityManager.findCredential(`${portalUrl}/sharing`);
+      await ensureEmbeddingsResource(envItemId, portal.user.username ?? "", credential?.token ?? "");
+    }
+    return envItemId;
+  }
 
   const portal = await getPortal();
   if (!portal.user) {
