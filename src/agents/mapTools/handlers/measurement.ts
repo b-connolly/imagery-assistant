@@ -1,30 +1,8 @@
-import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
-import type { RunnableConfig } from "@langchain/core/runnables";
-import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
-import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
-import { getCurrentView, getCurrentViewType, onViewChange, requestViewSwitch } from "../../utils/viewManager";
-import { extractLastUserText, elapsed, AGENT_KEYWORDS } from "../../utils/agentHelpers";
+import { getCurrentView, getCurrentViewType, onViewChange, requestViewSwitch } from "../../../utils/viewManager";
+import { elapsed } from "../../../utils/agentHelpers";
 import Collection from "@arcgis/core/core/Collection";
 import ElevationProfileLineGround from "@arcgis/core/analysis/ElevationProfile/ElevationProfileLineGround";
 import ElevationProfileLineScene from "@arcgis/core/analysis/ElevationProfile/ElevationProfileLineScene";
-
-// ── State ────────────────────────────────────────────────────────────────────
-
-const MeasurementState = Annotation.Root({
-  messages: Annotation<ChatHistory>({
-    reducer: messagesStateReducer,
-    default: () => [],
-  }),
-  outputMessage: Annotation<string>({
-    reducer: (current = "", update) =>
-      typeof update === "string" && update.trim()
-        ? (current ? `${current}\n\n${update}` : update)
-        : current,
-    default: () => "",
-  }),
-});
-
-type MeasurementStateType = typeof MeasurementState.State;
 
 // ── Active widget tracking ──────────────────────────────────────────────────
 
@@ -196,33 +174,10 @@ function createMeasurementComponent(
   return wrapper;
 }
 
-// ── Agent ────────────────────────────────────────────────────────────────────
+// ── Handler ─────────────────────────────────────────────────────────────────
 
-async function measurementNode(s: MeasurementStateType, config?: RunnableConfig) {
-  await sendTraceMessage({ text: "Measurement: processing request" }, config);
-
-  const text = extractLastUserText(s);
+export async function measurementHandler(text: string): Promise<{ outputMessage: string }> {
   const t0 = performance.now();
-  console.log("[Measurement] Starting. User text:", text);
-
-  // ── Bail out if another agent owns this request ──
-  const bailouts = [
-    { pattern: AGENT_KEYWORDS.imagery, label: "ImageryToolsAgent" },
-    { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
-    { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
-    { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
-    { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
-    { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
-    { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
-    { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
-    { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
-  ];
-  for (const { pattern, label } of bailouts) {
-    if (pattern.test(text)) {
-      console.log(`[Measurement] Skipping — ${label} territory.`);
-      return { outputMessage: "" };
-    }
-  }
 
   const view = getCurrentView() as any;
   if (!view) {
@@ -380,32 +335,3 @@ async function measurementNode(s: MeasurementStateType, config?: RunnableConfig)
     }
   }
 }
-
-// ── Graph builder ───────────────────────────────────────────────────────────
-
-const createMeasurementGraph = () =>
-  new StateGraph(MeasurementState)
-    .addNode("measurementNode", measurementNode)
-    .addEdge(START, "measurementNode")
-    .addEdge("measurementNode", END);
-
-// ── Agent registration ──────────────────────────────────────────────────────
-
-export const MeasurementAgent: AgentRegistration = {
-  id: "measurement-agent",
-  name: "Measurement Tools",
-  description:
-    "Activates measurement and analysis tools on the map. " +
-    "Supports distance measurement (line length), area measurement (polygon area), " +
-    "volume measurement (cut-fill and stockpile volume in 3D), " +
-    "and elevation profile (terrain cross-section along a drawn line). " +
-    "Works in both 2D and 3D views with appropriate widgets. " +
-    "Volume measurement automatically switches to 3D and works on ground, integrated meshes, and 3D tiles. " +
-    "Supports unit specification: meters, kilometers, feet, miles, acres, hectares, cubic meters, etc. " +
-    "Use when the user wants to measure, calculate distance, area, or volume, draw a ruler, " +
-    "see an elevation profile or cross-section, asks 'how far' between points, " +
-    "or wants to calculate cut/fill, stockpile, excavation, or earthwork volumes. " +
-    "Also use when the user says 'clear measurement' or 'stop measuring'.",
-  createGraph: createMeasurementGraph,
-  workspace: MeasurementState,
-};

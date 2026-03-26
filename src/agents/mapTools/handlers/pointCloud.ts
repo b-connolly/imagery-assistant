@@ -1,32 +1,8 @@
-import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
-import type { RunnableConfig } from "@langchain/core/runnables";
-import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
-import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
-import { getCurrentView, getCurrentViewType } from "../../utils/viewManager";
+import { getCurrentView, getCurrentViewType } from "../../../utils/viewManager";
 import {
-  extractLastUserText,
   findLayerByTitle,
   elapsed,
-  AGENT_KEYWORDS,
-} from "../../utils/agentHelpers";
-
-// ── State ────────────────────────────────────────────────────────────────────
-
-const PointCloudState = Annotation.Root({
-  messages: Annotation<ChatHistory>({
-    reducer: messagesStateReducer,
-    default: () => [],
-  }),
-  outputMessage: Annotation<string>({
-    reducer: (current = "", update) =>
-      typeof update === "string" && update.trim()
-        ? (current ? `${current}\n\n${update}` : update)
-        : current,
-    default: () => "",
-  }),
-});
-
-type PointCloudStateType = typeof PointCloudState.State;
+} from "../../../utils/agentHelpers";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -290,36 +266,14 @@ async function applyFilter(layer: any, field: string, values: number[], mode: "i
   return `Filtered "${layer.title}" — ${modeLabel} **${field}** [${values.join(", ")}].`;
 }
 
-// ── Agent ────────────────────────────────────────────────────────────────────
+// ── Handler ──────────────────────────────────────────────────────────────────
 
-const createPointCloudGraph = () => {
-    async function pointCloudNode(s: PointCloudStateType, config?: RunnableConfig) {
-      await sendTraceMessage({ text: "PointCloud: processing request" }, config);
-      const text = extractLastUserText(s);
+export async function pointCloudHandler(text: string): Promise<{ outputMessage: string }> {
       console.log("[PointCloud] Starting. User text:", text);
 
       const view = getCurrentView();
       if (!view?.map) {
         return { outputMessage: "No map view is currently available." };
-      }
-
-      // ── Bail out if another agent owns this request ──
-      const bailouts = [
-        { pattern: AGENT_KEYWORDS.imagery, label: "ImageryToolsAgent" },
-        { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
-        { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
-        { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
-        { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
-        { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
-        { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
-        { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
-        { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
-      ];
-      for (const { pattern, label } of bailouts) {
-        if (pattern.test(text)) {
-          console.log(`[PointCloud] Skipping — ${label} territory.`);
-          return { outputMessage: "" };
-        }
       }
 
       const intent = quickExtract(text);
@@ -455,27 +409,4 @@ const createPointCloudGraph = () => {
       }
 
       return { outputMessage: "" };
-    }
-
-    return new StateGraph(PointCloudState)
-      .addNode("pointCloudNode", pointCloudNode)
-      .addEdge(START, "pointCloudNode")
-      .addEdge("pointCloudNode", END);
-};
-
-export const PointCloudAgent: AgentRegistration = {
-  id: "point-cloud-agent",
-  name: "Point Cloud Agent",
-  description:
-    "Manages point cloud layer visualization and filtering. " +
-    "Supports changing symbology (class code, elevation, intensity, RGB, return number), " +
-    "filtering by classification (ground, vegetation, buildings, water), " +
-    "adjusting point size and density, and resetting to defaults. " +
-    "Use when the user mentions point cloud, LiDAR, LAS, classification, class code, " +
-    "point size, point density, return number, or wants to filter/color point cloud data. " +
-    "Keywords: point cloud, lidar, las, classification, class code, filter points, " +
-    "color by elevation, intensity, rgb, return number, point size, point density, " +
-    "reset filter, clear filter, reset symbology, remove filter, clear symbology.",
-  createGraph: createPointCloudGraph,
-  workspace: PointCloudState,
-};
+}

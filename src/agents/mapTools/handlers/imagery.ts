@@ -1,14 +1,8 @@
-import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
-import type { RunnableConfig } from "@langchain/core/runnables";
-import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
-import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
 import ImageryLayer from "@arcgis/core/layers/ImageryLayer";
-import { getCurrentView, onViewChange } from "../../utils/viewManager";
+import { getCurrentView, onViewChange } from "../../../utils/viewManager";
 import {
-  extractLastUserText,
   findLayerByTitle,
-  AGENT_KEYWORDS,
-} from "../../utils/agentHelpers";
+} from "../../../utils/agentHelpers";
 import {
   applyStretch,
   applyServerTemplate,
@@ -18,25 +12,7 @@ import {
   getBandInfos,
   SDK_COLOR_RAMPS,
   type StretchType,
-} from "../../utils/rasterFunctions";
-
-// ── State ────────────────────────────────────────────────────────────────────
-
-const ImageryToolsState = Annotation.Root({
-  messages: Annotation<ChatHistory>({
-    reducer: messagesStateReducer,
-    default: () => [],
-  }),
-  outputMessage: Annotation<string>({
-    reducer: (current = "", update) =>
-      typeof update === "string" && update.trim()
-        ? (current ? `${current}\n\n${update}` : update)
-        : current,
-    default: () => "",
-  }),
-});
-
-type ImageryToolsStateType = typeof ImageryToolsState.State;
+} from "../../../utils/rasterFunctions";
 
 // ── Active click handler tracking ────────────────────────────────────────────
 
@@ -88,30 +64,10 @@ function findImageryLayer(view: any, hint: string | null): ImageryLayer | null {
   return imgLayers.length > 0 ? imgLayers[imgLayers.length - 1] : null;
 }
 
-// ── Agent ────────────────────────────────────────────────────────────────────
+// ── Handler ──────────────────────────────────────────────────────────────────
 
-const createImageryToolsGraph = () => {
-    async function imageryToolsNode(s: ImageryToolsStateType, config?: RunnableConfig) {
-      await sendTraceMessage({ text: "ImageryTools: processing request" }, config);
-      const text = extractLastUserText(s);
+export async function imageryHandler(text: string): Promise<{ outputMessage: string }> {
       console.log("[ImageryTools] Starting. User text:", text);
-
-      // ── Bailouts ─────────────────────────────────────────────────────
-      const bailouts = [
-        { pattern: /\b(load|add|open|remove|delete|zoom\s*to|fly\s*to)\b/i, label: "LoadLayerAgent" },
-        { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
-        { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
-        { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
-        { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
-        { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
-        { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
-      ];
-      for (const { pattern, label } of bailouts) {
-        if (pattern.test(text)) {
-          console.log(`[ImageryTools] Skipping — ${label} territory.`);
-          return { outputMessage: "" };
-        }
-      }
 
       const view = getCurrentView();
       if (!view?.map) return { outputMessage: "No active map view." };
@@ -345,28 +301,4 @@ const createImageryToolsGraph = () => {
           `- **"enable identify"** — click to see pixel values\n` +
           `- **"reset rendering"** — clear processing back to default`,
       };
-    }
-
-    return new StateGraph(ImageryToolsState)
-      .addNode("imageryToolsNode", imageryToolsNode)
-      .addEdge(START, "imageryToolsNode")
-      .addEdge("imageryToolsNode", END);
-};
-
-export const ImageryToolsAgent: AgentRegistration = {
-  id: "imagery-tools-agent",
-  name: "Imagery Tools",
-  description:
-    "Manages imagery layer rendering and analysis. " +
-    "Apply server-side processing templates (NDVI, Hillshade, Slope, Color IR, etc.), " +
-    "enable click-to-identify pixel values, describe imagery layer properties, " +
-    "list available raster functions, and reset rendering to defaults. " +
-    "Use when the user mentions processing template, raster function, identify pixels, " +
-    "pixel values, popup on imagery, apply NDVI, apply hillshade, apply stretch, " +
-    "color infrared, imagery tools, describe imagery, list templates, reset rendering. " +
-    "Keywords: stretch, NDVI, hillshade, slope, aspect, color infrared, false color, " +
-    "processing template, raster function, identify, pixel values, popup, screenshot, " +
-    "imagery tools, band, spectral, rendering, reset rendering, clear function.",
-  createGraph: createImageryToolsGraph,
-  workspace: ImageryToolsState,
-};
+}

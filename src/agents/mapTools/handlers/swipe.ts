@@ -1,27 +1,5 @@
-import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
-import type { RunnableConfig } from "@langchain/core/runnables";
-import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
-import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
-import { getCurrentView, getMapSceneElement } from "../../utils/viewManager";
-import { extractLastUserText, findLayerByTitle, elapsed, AGENT_KEYWORDS } from "../../utils/agentHelpers";
-
-// ── State ────────────────────────────────────────────────────────────────────
-
-const SwipeState = Annotation.Root({
-  messages: Annotation<ChatHistory>({
-    reducer: messagesStateReducer,
-    default: () => [],
-  }),
-  outputMessage: Annotation<string>({
-    reducer: (current = "", update) =>
-      typeof update === "string" && update.trim()
-        ? (current ? `${current}\n\n${update}` : update)
-        : current,
-    default: () => "",
-  }),
-});
-
-type SwipeStateType = typeof SwipeState.State;
+import { getCurrentView, getMapSceneElement } from "../../../utils/viewManager";
+import { findLayerByTitle, elapsed } from "../../../utils/agentHelpers";
 
 // ── Active swipe tracking ───────────────────────────────────────────────────
 
@@ -112,33 +90,11 @@ function formatLayerList(layers: any[]): string {
     .join("\n");
 }
 
-// ── Graph node ──────────────────────────────────────────────────────────────
+// ── Handler ─────────────────────────────────────────────────────────────────
 
-async function swipeNode(s: SwipeStateType, config?: RunnableConfig) {
-  const text = extractLastUserText(s);
+export async function swipeHandler(text: string): Promise<{ outputMessage: string }> {
   const t0 = performance.now();
   console.log("[Swipe] Starting. User text:", text);
-
-  await sendTraceMessage({ text: "Swipe: processing request" }, config);
-
-  // ── Bail out if another agent owns this request ──
-  const bailouts = [
-    { pattern: AGENT_KEYWORDS.imagery, label: "ImageryToolsAgent" },
-    { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
-    { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
-    { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
-    { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
-    { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
-    { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
-    { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
-    { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
-  ];
-  for (const { pattern, label } of bailouts) {
-    if (pattern.test(text)) {
-      console.log(`[Swipe] Skipping — ${label} territory.`);
-      return { outputMessage: "" };
-    }
-  }
 
   const view = getCurrentView() as any;
   if (!view) {
@@ -258,30 +214,7 @@ async function swipeNode(s: SwipeStateType, config?: RunnableConfig) {
       };
     }
   }
+
+  // Fallback (should not be reached)
+  return { outputMessage: "" };
 }
-
-// ── Graph builder ───────────────────────────────────────────────────────────
-
-const createSwipeGraph = () =>
-  new StateGraph(SwipeState)
-    .addNode("swipeNode", swipeNode)
-    .addEdge(START, "swipeNode")
-    .addEdge("swipeNode", END);
-
-// ── Agent registration ──────────────────────────────────────────────────────
-
-export const SwipeAgent: AgentRegistration = {
-  id: "swipe-agent",
-  name: "Swipe / Compare",
-  description:
-    "Activates a swipe tool to visually compare two layers side by side on the map. " +
-    "Drag a handle across the map to reveal one layer on each side. " +
-    "Supports horizontal (left/right) and vertical (top/bottom) directions. " +
-    "Use when the user wants to compare, swipe, split, or see differences between two layers. " +
-    "Handles 'compare layer 1 and layer 2', 'compare layer 3 and layer 5', " +
-    "'swipe between X and Y', 'side by side', 'versus'. " +
-    "Also use when the user says 'clear swipe' or 'stop comparing'. " +
-    "Keywords: compare, swipe, split, side by side, versus, vs, compare layer.",
-  createGraph: createSwipeGraph,
-  workspace: SwipeState,
-};

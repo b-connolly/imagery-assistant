@@ -1,33 +1,6 @@
-import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
-import type { RunnableConfig } from "@langchain/core/runnables";
-import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
-import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
-import {
-  extractLastUserText,
-  findLayerByTitle,
-  elapsed,
-  AGENT_KEYWORDS,
-} from "../../utils/agentHelpers";
-import { getCurrentView } from "../../utils/viewManager";
-import { withTimeout } from "../../utils/safeFetch";
-
-// ── State ────────────────────────────────────────────────────────────────────
-
-const LayerInfoState = Annotation.Root({
-  messages: Annotation<ChatHistory>({
-    reducer: messagesStateReducer,
-    default: () => [],
-  }),
-  outputMessage: Annotation<string>({
-    reducer: (current = "", update) =>
-      typeof update === "string" && update.trim()
-        ? (current ? `${current}\n\n${update}` : update)
-        : current,
-    default: () => "",
-  }),
-});
-
-type LayerInfoStateType = typeof LayerInfoState.State;
+import { getCurrentView } from "../../../utils/viewManager";
+import { findLayerByTitle } from "../../../utils/agentHelpers";
+import { withTimeout } from "../../../utils/safeFetch";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -350,12 +323,9 @@ function formatStats(stats: BandStats[], layerTitle: string): string {
   return lines.join("\n");
 }
 
-// ── Agent ────────────────────────────────────────────────────────────────────
+// ── Handler ─────────────────────────────────────────────────────────────────
 
-async function infoNode(s: LayerInfoStateType, config?: RunnableConfig) {
-  await sendTraceMessage({ text: "LayerInfo: processing request" }, config);
-
-  const text = extractLastUserText(s);
+export async function layerInfoHandler(text: string): Promise<{ outputMessage: string }> {
   const view = getCurrentView();
 
   if (!view?.map) {
@@ -377,25 +347,6 @@ async function infoNode(s: LayerInfoStateType, config?: RunnableConfig) {
         `**Layer order** (bottom → top):\n\n${lines.join("\n")}\n\n` +
         `${layers.length} layer${layers.length > 1 ? "s" : ""} total.`,
     };
-  }
-
-  // ── Bail out if another agent owns this request ──
-  const bailouts = [
-    { pattern: AGENT_KEYWORDS.imagery, label: "ImageryToolsAgent" },
-    { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
-    { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
-    { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
-    { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
-    { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
-    { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
-    { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
-    { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
-  ];
-  for (const { pattern, label } of bailouts) {
-    if (pattern.test(text)) {
-      console.log(`[LayerInfo] Skipping — ${label} territory.`);
-      return { outputMessage: "" };
-    }
   }
 
   // ── Create/configure popup with specific fields ──
@@ -446,7 +397,7 @@ async function infoNode(s: LayerInfoStateType, config?: RunnableConfig) {
       // For imagery layers, enable click-to-identify pixel values directly
       const imgView = getCurrentView() as any;
       if (imgView) {
-        const { identifyPixel } = await import("../../utils/rasterFunctions");
+        const { identifyPixel } = await import("../../../utils/rasterFunctions");
         // Remove any existing click handler
         if ((window as any).__imgIdentifyRemove) {
           (window as any).__imgIdentifyRemove();
@@ -661,31 +612,3 @@ async function infoNode(s: LayerInfoStateType, config?: RunnableConfig) {
 
   return { outputMessage: header + "\n" + summaries.join("\n\n---\n\n") };
 }
-
-// ── Graph builder ───────────────────────────────────────────────────────────
-
-const createLayerInfoGraph = () =>
-  new StateGraph(LayerInfoState)
-    .addNode("infoNode", infoNode)
-    .addEdge(START, "infoNode")
-    .addEdge("infoNode", END);
-
-// ── Agent registration ──────────────────────────────────────────────────────
-
-export const LayerInfoAgent: AgentRegistration = {
-  id: "layer-info-agent",
-  name: "Layer Info",
-  description:
-    "Query layers for detailed information including fields, attributes, popup configuration, " +
-    "metadata, tables, sublayers, capabilities, spatial reference, extent, and processing templates. " +
-    "Also computes raster statistics (min, max, mean, standard deviation) for imagery and elevation layers. " +
-    "Handles 'what is the layer order', 'list layers', 'describe layer 4', 'describe [layer name]'. " +
-    "Use when the user asks about layer properties, attributes, fields, schema, popup info, " +
-    "metadata, what data a layer contains, available tables, layer order, draw order, or raster/elevation statistics. " +
-    "Keywords: fields, attributes, columns, schema, popup, metadata, tables, info, describe, " +
-    "properties, capabilities, band count, pixel type, processing templates, sublayers, " +
-    "layer order, draw order, what layers, list layers, describe layer, " +
-    "statistics, stats, minimum, maximum, lowest, highest, average, mean, elevation value, pixel range.",
-  createGraph: createLayerInfoGraph,
-  workspace: LayerInfoState,
-};

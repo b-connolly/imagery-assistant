@@ -22,17 +22,9 @@ import ViewToggle from "./components/ViewToggle";
 import AgentElement from "./components/AgentElement";
 // discovery
 import { ContentSearchAgent } from "./agents/discovery/contentSearch";
-import { LoadLayerAgent } from "./agents/discovery/LoadLayerAgent";
-// visualization
-import { ImageryToolsAgent } from "./agents/visualization/ImageryToolsAgent";
-import { PointCloudAgent } from "./agents/visualization/PointCloudAgent";
-import { OrientedImageryAgent } from "./agents/visualization/OrientedImageryAgent";
-import { CatalogLayerAgent } from "./agents/visualization/CatalogLayerAgent";
-// analysis
-import { SwipeAgent } from "./agents/analysis/SwipeAgent";
-import { LayerInfoAgent } from "./agents/analysis/LayerInfoAgent";
-import { MeasurementAgent } from "./agents/analysis/MeasurementAgent";
-import { ElevationOffsetAgent } from "./agents/analysis/ElevationOffsetAgent";
+import { LoadLayerAgent } from "./agents/discovery/loadLayer";
+// tools (consolidated — handles imagery, point cloud, elevation, measurement, swipe, layer info, etc.)
+import { MapToolsAgent } from "./agents/mapTools";
 
 // Global default — zoomed out to show the full world
 const DEFAULT_CENTER = [0, 20];
@@ -691,16 +683,9 @@ export default function App() {
                   crashes on SceneView. LoadLayerAgent handles geocoding instead. */}
               <arcgis-assistant-data-exploration-agent />
               {/* Custom agents — AgentElement sets the agent property imperatively (React 18 compat) */}
-              {/* Action agents first — faster routing for common operations */}
-              <AgentElement agent={ElevationOffsetAgent} />
-              <AgentElement agent={ImageryToolsAgent} />
+              {/* MapTools first — handles most layer operations via fast regex */}
+              <AgentElement agent={MapToolsAgent} />
               <AgentElement agent={LoadLayerAgent} />
-              <AgentElement agent={PointCloudAgent} />
-              <AgentElement agent={MeasurementAgent} />
-              <AgentElement agent={SwipeAgent} />
-              <AgentElement agent={LayerInfoAgent} />
-              <AgentElement agent={OrientedImageryAgent} />
-              <AgentElement agent={CatalogLayerAgent} />
               {/* Search/discovery last — has LLM node that adds latency */}
               <AgentElement agent={ContentSearchAgent} />
             </arcgis-assistant>

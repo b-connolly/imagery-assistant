@@ -1,32 +1,10 @@
-import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
-import type { RunnableConfig } from "@langchain/core/runnables";
-import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
-import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
 import { invokeToolPrompt } from "@arcgis/ai-orchestrator";
 import { HumanMessage } from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { getCurrentView, getCurrentViewType, requestViewSwitch, getOperationalLayers, onViewChange } from "../../utils/viewManager";
-import { REQUIRES_3D, extractLastUserText, findLayerByTitle, elapsed, AGENT_KEYWORDS } from "../../utils/agentHelpers";
-import { withTimeout } from "../../utils/safeFetch";
-
-// ── State ────────────────────────────────────────────────────────────────────
-
-const ElevationOffsetState = Annotation.Root({
-  messages: Annotation<ChatHistory>({
-    reducer: messagesStateReducer,
-    default: () => [],
-  }),
-  outputMessage: Annotation<string>({
-    reducer: (current = "", update) =>
-      typeof update === "string" && update.trim()
-        ? (current ? `${current}\n\n${update}` : update)
-        : current,
-    default: () => "",
-  }),
-});
-
-type ElevationOffsetStateType = typeof ElevationOffsetState.State;
+import { getCurrentView, getCurrentViewType, requestViewSwitch, getOperationalLayers, onViewChange } from "../../../utils/viewManager";
+import { REQUIRES_3D, findLayerByTitle, elapsed } from "../../../utils/agentHelpers";
+import { withTimeout } from "../../../utils/safeFetch";
 
 // ── Extraction tool ──────────────────────────────────────────────────────────
 
@@ -166,32 +144,11 @@ function refreshLayer(view: any, layer: any): void {
 /** Mesh layer types that may not render below ground with negative offsets */
 const MESH_TYPES = new Set(["integrated-mesh", "integrated-mesh-3dtiles", "gaussian-splat"]);
 
-// ── Agent ────────────────────────────────────────────────────────────────────
+// ── Handler ──────────────────────────────────────────────────────────────────
 
-async function elevationOffsetNode(s: ElevationOffsetStateType, config?: RunnableConfig) {
-  await sendTraceMessage({ text: "ElevationOffset: processing request" }, config);
-
-  const text = extractLastUserText(s);
+export async function elevationOffsetHandler(text: string): Promise<{ outputMessage: string }> {
   const t0 = performance.now();
   console.log("[ElevOffset] Starting. User text:", text);
-
-  // ── Bail out if another agent owns this request ──
-  const bailouts = [
-    { pattern: AGENT_KEYWORDS.imagery, label: "ImageryToolsAgent" },
-    { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
-    { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
-    { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
-    { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
-    { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
-    { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
-    { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
-  ];
-  for (const { pattern, label } of bailouts) {
-    if (pattern.test(text)) {
-      console.log(`[ElevOffset] Skipping — ${label} territory.`);
-      return { outputMessage: "" };
-    }
-  }
 
   // ── Ensure 3D view ──────────────────────────────────────────────
   if (getCurrentViewType() !== "3d") {
@@ -609,28 +566,3 @@ async function elevationOffsetNode(s: ElevationOffsetStateType, config?: Runnabl
   return { outputMessage: results.join(" ") };
 }
 
-// ── Graph builder ───────────────────────────────────────────────────────────
-
-const createElevationOffsetGraph = () =>
-  new StateGraph(ElevationOffsetState)
-    .addNode("elevationOffsetNode", elevationOffsetNode)
-    .addEdge(START, "elevationOffsetNode")
-    .addEdge("elevationOffsetNode", END);
-
-// ── Agent registration ───────────────────────────────────────────────────────
-
-export const ElevationOffsetAgent: AgentRegistration = {
-  id: "elevation-offset-agent",
-  name: "Fix Elevation Offset",
-  description:
-    "Fixes vertical elevation offset for 3D layers that float above or sink below the terrain. " +
-    "Auto-detects the offset by comparing the layer's z-position to the ground elevation, " +
-    "or lets the user set a manual offset. Works with Integrated Meshes, Gaussian Splats, " +
-    "3D Tiles, Scene Layers, and other 3D layer types. " +
-    "Use when a 3D layer appears to be floating, underground, or misaligned vertically, " +
-    "or when the user wants to check, fix, or adjust elevation offset. " +
-    "Also use when the user wants to add, subtract, raise, or lower a layer by a number of meters " +
-    "(e.g., 'add 16m to the layer', 'lower the mesh by 20 meters', 'raise the Alcatraz layer 10m').",
-  createGraph: createElevationOffsetGraph,
-  workspace: ElevationOffsetState,
-};

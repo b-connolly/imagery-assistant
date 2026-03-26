@@ -1,32 +1,5 @@
-import { Annotation, messagesStateReducer, StateGraph, START, END } from "@langchain/langgraph/web";
-import type { RunnableConfig } from "@langchain/core/runnables";
-import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
-import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
-import { getCurrentView, getMapSceneElement, onViewChange } from "../../utils/viewManager";
-import {
-  extractLastUserText,
-  findLayerByTitle,
-  elapsed,
-  AGENT_KEYWORDS,
-} from "../../utils/agentHelpers";
-
-// ── State ────────────────────────────────────────────────────────────────────
-
-const CatalogLayerState = Annotation.Root({
-  messages: Annotation<ChatHistory>({
-    reducer: messagesStateReducer,
-    default: () => [],
-  }),
-  outputMessage: Annotation<string>({
-    reducer: (current = "", update) =>
-      typeof update === "string" && update.trim()
-        ? (current ? `${current}\n\n${update}` : update)
-        : current,
-    default: () => "",
-  }),
-});
-
-type CatalogLayerStateType = typeof CatalogLayerState.State;
+import { getCurrentView, getMapSceneElement, onViewChange } from "../../../utils/viewManager";
+import { findLayerByTitle, elapsed } from "../../../utils/agentHelpers";
 
 // ── Active panel tracking ───────────────────────────────────────────────────
 
@@ -310,124 +283,87 @@ function extractCatalogIntent(text: string): { action: CatalogAction; filterType
   return { action: "open", filterTypes: [] };
 }
 
-// ── Agent registration ──────────────────────────────────────────────────────
+// ── Handler ─────────────────────────────────────────────────────────────────
 
-const createCatalogLayerGraph = () => {
-    async function catalogNode(s: CatalogLayerStateType, config?: RunnableConfig) {
-      await sendTraceMessage({ text: "CatalogLayer: processing request" }, config);
-      const text = extractLastUserText(s);
-      const t0 = performance.now();
-      console.log("[CatalogFilter] Starting. User text:", text);
+export async function catalogHandler(text: string): Promise<{ outputMessage: string }> {
+  const t0 = performance.now();
+  console.log("[CatalogFilter] Starting. User text:", text);
 
-      // Bail out for other agents
-      const bailoutChecks = [
-        { pattern: AGENT_KEYWORDS.imagery, label: "ImageryAnalysisAgent" },
-        { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
-        { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
-        { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
-        { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
-        { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
-        { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
-      ];
-      for (const { pattern, label } of bailoutChecks) {
-        if (pattern.test(text)) {
-          console.log(`[CatalogFilter] Skipping — ${label} territory.`);
-          return { outputMessage: "" };
-        }
-      }
+  const view = getCurrentView() as any;
+  if (!view?.map) return { outputMessage: "No active map view." };
 
-      const view = getCurrentView() as any;
-      if (!view?.map) return { outputMessage: "No active map view." };
+  const { action, filterTypes } = extractCatalogIntent(text);
+  console.log("[CatalogFilter] Action:", action, "FilterTypes:", filterTypes);
 
-      const { action, filterTypes } = extractCatalogIntent(text);
-      console.log("[CatalogFilter] Action:", action, "FilterTypes:", filterTypes);
-
-      switch (action) {
-        case "close": {
-          if (clearPanel()) return { outputMessage: "Catalog filter panel closed." };
-          return { outputMessage: "No catalog filter panel is open." };
-        }
-
-        case "clear": {
-          const catalogs = findCatalogLayers(view);
-          if (catalogs.length === 0) return { outputMessage: "No catalog layers on the map." };
-          // Clear filter on active or all catalog layers
-          const target = activeCatalogLayer ?? catalogs[catalogs.length - 1];
-          target.definitionExpression = null;
-          return { outputMessage: `Cleared filter on "${target.title}". All items are now visible.` };
-        }
-
-        case "filter": {
-          const catalogs = findCatalogLayers(view);
-          if (catalogs.length === 0) return { outputMessage: "No catalog layers on the map. Load a catalog layer first." };
-          const target = activeCatalogLayer ?? catalogs[catalogs.length - 1];
-          const typeList = filterTypes.map((t) => `'${t.replace(/'/g, "''")}'`).join(", ");
-          target.definitionExpression = `cd_itemtype IN (${typeList})`;
-          return { outputMessage: `Filtered "${target.title}" to: ${filterTypes.join(", ")}.` };
-        }
-
-        case "help": {
-          return {
-            outputMessage:
-              "**Catalog Layer Filter**\n\n" +
-              "Filter catalog items by type to find specific data.\n\n" +
-              "- \"open catalog filter\" — open the filter panel\n" +
-              "- \"close catalog filter\" — close the panel\n" +
-              "- \"filter catalog to imagery\" — filter by type via chat\n" +
-              "- \"clear catalog filter\" — show all items\n\n" +
-              "The panel shows checkboxes for each item type with counts. " +
-              "Select/deselect types and click Apply.",
-          };
-        }
-
-        case "open": {
-          const catalogs = findCatalogLayers(view);
-          if (catalogs.length === 0) {
-            return { outputMessage: "No catalog layers on the map. Load a catalog layer first, then say \"open catalog filter\"." };
-          }
-
-          clearPanel();
-
-          const parent = getMapSceneElement();
-          if (!parent) return { outputMessage: "Could not find the map element." };
-
-          const targetLayer = catalogs[catalogs.length - 1];
-          activeCatalogLayer = targetLayer;
-
-          // Ensure layer is loaded before querying
-          if (targetLayer.loadStatus !== "loaded") {
-            await targetLayer.load();
-          }
-
-          activePanel = await createFilterPanel(targetLayer, catalogs, parent);
-
-          const elapsedTime = elapsed(t0);
-          return {
-            outputMessage:
-              `Catalog filter opened for "${targetLayer.title}" (${elapsedTime}s).\n\n` +
-              "Select item types and click **Apply** to filter. " +
-              "The panel can be dragged and resized.",
-          };
-        }
-      }
+  switch (action) {
+    case "close": {
+      if (clearPanel()) return { outputMessage: "Catalog filter panel closed." };
+      return { outputMessage: "No catalog filter panel is open." };
     }
 
-    return new StateGraph(CatalogLayerState)
-      .addNode("catalogNode", catalogNode)
-      .addEdge(START, "catalogNode")
-      .addEdge("catalogNode", END);
-};
+    case "clear": {
+      const catalogs = findCatalogLayers(view);
+      if (catalogs.length === 0) return { outputMessage: "No catalog layers on the map." };
+      // Clear filter on active or all catalog layers
+      const target = activeCatalogLayer ?? catalogs[catalogs.length - 1];
+      target.definitionExpression = null;
+      return { outputMessage: `Cleared filter on "${target.title}". All items are now visible.` };
+    }
 
-export const CatalogLayerAgent: AgentRegistration = {
-  id: "catalog-layer-agent",
-  name: "Catalog Layer Filter",
-  description:
-    "Opens a filter panel for CatalogLayer items, allowing users to filter by item type " +
-    "(Feature Service, Image Service, etc.). Supports multiple catalog layers with a dropdown selector. " +
-    "Use when the user mentions catalog filter, filter catalog, catalog items, catalog types, " +
-    "item type filter, cd_itemtype, or wants to filter/browse catalog layer contents. " +
-    "Keywords: catalog filter, filter catalog, catalog items, catalog types, item type filter, " +
-    "open catalog filter, close catalog filter, clear catalog filter.",
-  createGraph: createCatalogLayerGraph,
-  workspace: CatalogLayerState,
-};
+    case "filter": {
+      const catalogs = findCatalogLayers(view);
+      if (catalogs.length === 0) return { outputMessage: "No catalog layers on the map. Load a catalog layer first." };
+      const target = activeCatalogLayer ?? catalogs[catalogs.length - 1];
+      const typeList = filterTypes.map((t) => `'${t.replace(/'/g, "''")}'`).join(", ");
+      target.definitionExpression = `cd_itemtype IN (${typeList})`;
+      return { outputMessage: `Filtered "${target.title}" to: ${filterTypes.join(", ")}.` };
+    }
+
+    case "help": {
+      return {
+        outputMessage:
+          "**Catalog Layer Filter**\n\n" +
+          "Filter catalog items by type to find specific data.\n\n" +
+          "- \"open catalog filter\" — open the filter panel\n" +
+          "- \"close catalog filter\" — close the panel\n" +
+          "- \"filter catalog to imagery\" — filter by type via chat\n" +
+          "- \"clear catalog filter\" — show all items\n\n" +
+          "The panel shows checkboxes for each item type with counts. " +
+          "Select/deselect types and click Apply.",
+      };
+    }
+
+    case "open": {
+      const catalogs = findCatalogLayers(view);
+      if (catalogs.length === 0) {
+        return { outputMessage: "No catalog layers on the map. Load a catalog layer first, then say \"open catalog filter\"." };
+      }
+
+      clearPanel();
+
+      const parent = getMapSceneElement();
+      if (!parent) return { outputMessage: "Could not find the map element." };
+
+      const targetLayer = catalogs[catalogs.length - 1];
+      activeCatalogLayer = targetLayer;
+
+      // Ensure layer is loaded before querying
+      if (targetLayer.loadStatus !== "loaded") {
+        await targetLayer.load();
+      }
+
+      activePanel = await createFilterPanel(targetLayer, catalogs, parent);
+
+      const elapsedTime = elapsed(t0);
+      return {
+        outputMessage:
+          `Catalog filter opened for "${targetLayer.title}" (${elapsedTime}s).\n\n` +
+          "Select item types and click **Apply** to filter. " +
+          "The panel can be dragged and resized.",
+      };
+    }
+  }
+
+  // Fallback (should not be reached)
+  return { outputMessage: "" };
+}
