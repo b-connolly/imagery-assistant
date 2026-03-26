@@ -3,7 +3,7 @@ import type { RunnableConfig } from "@langchain/core/runnables";
 import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
 import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
 import { getCurrentView, getMapSceneElement } from "../../utils/viewManager";
-import { extractLastUserText, findLayerByTitle, elapsed } from "../../utils/agentHelpers";
+import { extractLastUserText, findLayerByTitle, elapsed, AGENT_KEYWORDS } from "../../utils/agentHelpers";
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -120,6 +120,25 @@ async function swipeNode(s: SwipeStateType, config?: RunnableConfig) {
   console.log("[Swipe] Starting. User text:", text);
 
   await sendTraceMessage({ text: "Swipe: processing request" }, config);
+
+  // ── Bail out if another agent owns this request ──
+  const bailouts = [
+    { pattern: AGENT_KEYWORDS.imagery, label: "ImageryToolsAgent" },
+    { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
+    { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
+    { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
+    { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
+    { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
+    { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
+    { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
+    { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
+  ];
+  for (const { pattern, label } of bailouts) {
+    if (pattern.test(text)) {
+      console.log(`[Swipe] Skipping — ${label} territory.`);
+      return { outputMessage: "" };
+    }
+  }
 
   const view = getCurrentView() as any;
   if (!view) {

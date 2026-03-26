@@ -7,6 +7,7 @@ import {
   extractLastUserText,
   findLayerByTitle,
   elapsed,
+  AGENT_KEYWORDS,
 } from "../../utils/agentHelpers";
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -302,10 +303,23 @@ const createPointCloudGraph = () => {
         return { outputMessage: "No map view is currently available." };
       }
 
-      // Bail out for non-point-cloud requests
-      if (/\b(search|find|browse|load|add|open|remove|delete)\b/i.test(text) &&
-          !/\b(filter|symbolog|color|render|point\s*size|density|reset|class|elevation|intensity|rgb|return)\b/i.test(text)) {
-        return { outputMessage: "" };
+      // ── Bail out if another agent owns this request ──
+      const bailouts = [
+        { pattern: AGENT_KEYWORDS.imagery, label: "ImageryToolsAgent" },
+        { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
+        { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
+        { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
+        { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
+        { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
+        { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
+        { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
+        { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
+      ];
+      for (const { pattern, label } of bailouts) {
+        if (pattern.test(text)) {
+          console.log(`[PointCloud] Skipping — ${label} territory.`);
+          return { outputMessage: "" };
+        }
       }
 
       const intent = quickExtract(text);

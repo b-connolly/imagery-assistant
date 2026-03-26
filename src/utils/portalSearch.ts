@@ -1,6 +1,7 @@
 import PortalQueryParams from "@arcgis/core/portal/PortalQueryParams";
 import type PortalItem from "@arcgis/core/portal/PortalItem";
 import { getPortal } from "./arcgisAuth";
+import { ALL_LAYER_TYPES } from "./typeFilterRegistry";
 
 export interface PortalSearchResult {
   itemId: string;
@@ -111,43 +112,7 @@ export interface ScopedSearchResults {
   results: PortalSearchResult[];
 }
 
-// Official ArcGIS Online portal item types for layer/service search.
-// Reference: https://developers.arcgis.com/rest/users-groups-and-items/items-and-item-types/
-//
-// Sub-types within Scene Service (Point Cloud, Building, IntegratedMesh, Voxel)
-// and 3DTiles Service (GaussianSplat, IntegratedMesh, 3DObject) are distinguished
-// by typeKeywords, not by separate item types.
-const ALL_LAYER_TYPES = [
-  // Imagery & raster
-  "Image Service",
-  "Imagery Layer",
-  "Imagery Tile Layer",
-  "WCS",
-  "Media Layer",
-  // 3D scene
-  "Scene Service",
-  "Scene Layer",
-  "3DTiles Service",
-  // Oriented Imagery may be registered as "Feature Service" with typeKeyword
-  // "OrientedImageryLayer", or as the newer "Oriented Imagery Layer" portal type.
-  "Oriented Imagery Layer",
-  // Feature & vector
-  "Feature Service",
-  "Feature Layer",
-  "GeoJSON",
-  "CSV",
-  "KML",
-  "WFS",
-  "OGCFeatureServer",
-  "GeoRSS",
-  "Stream Service",
-  // Tile & map
-  "Map Service",
-  "Vector Tile Service",
-  "Tile Service",
-  "WMTS",
-  "WMS",
-];
+// ALL_LAYER_TYPES imported from typeFilterRegistry.ts (single source of truth)
 
 /**
  * Search for content across multiple scopes: My Content, My Org, AGOL, Living Atlas.

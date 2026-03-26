@@ -7,7 +7,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getCurrentView, getCurrentViewType, requestViewSwitch, getOperationalLayers, onViewChange } from "../../utils/viewManager";
-import { REQUIRES_3D, extractLastUserText, findLayerByTitle , elapsed } from "../../utils/agentHelpers";
+import { REQUIRES_3D, extractLastUserText, findLayerByTitle, elapsed, AGENT_KEYWORDS } from "../../utils/agentHelpers";
 import { withTimeout } from "../../utils/safeFetch";
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -175,30 +175,22 @@ async function elevationOffsetNode(s: ElevationOffsetStateType, config?: Runnabl
   const t0 = performance.now();
   console.log("[ElevOffset] Starting. User text:", text);
 
-  // ── Bail out: measurement/analysis commands belong to MeasurementAgent ──
-  if (
-    /\b(measure|measurement|measuring|ruler)\b/i.test(text) &&
-    !/\b(offset|fix|floating|align|underground)\b/i.test(text)
-  ) {
-    console.log("[ElevOffset] Skipping — looks like a measurement request for MeasurementAgent.");
-    return { outputMessage: "" };
-  }
-  if (/\b(elevation\s*profile|cross[- ]?section|terrain\s*profile)\b/i.test(text)) {
-    console.log("[ElevOffset] Skipping — elevation profile request for MeasurementAgent.");
-    return { outputMessage: "" };
-  }
-  if (
-    /\b(distance|area|polygon|acreage|hectare|how\s*far)\b/i.test(text) &&
-    !/\b(offset|elevation\s*offset|fix|floating|align)\b/i.test(text)
-  ) {
-    console.log("[ElevOffset] Skipping — distance/area request for MeasurementAgent.");
-    return { outputMessage: "" };
-  }
-
-  // ── Bail out: search/content commands belong to ContentSearchAgent ──
-  if (/\b(search|find|browse)\s+(for\s+)?(content|layers|items|data|imagery|services)\b/i.test(text)) {
-    console.log("[ElevOffset] Skipping — looks like a content search request.");
-    return { outputMessage: "" };
+  // ── Bail out if another agent owns this request ──
+  const bailouts = [
+    { pattern: AGENT_KEYWORDS.imagery, label: "ImageryToolsAgent" },
+    { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
+    { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
+    { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
+    { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
+    { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
+    { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
+    { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
+  ];
+  for (const { pattern, label } of bailouts) {
+    if (pattern.test(text)) {
+      console.log(`[ElevOffset] Skipping — ${label} territory.`);
+      return { outputMessage: "" };
+    }
   }
 
   // ── Ensure 3D view ──────────────────────────────────────────────

@@ -6,6 +6,7 @@ import {
   extractLastUserText,
   findLayerByTitle,
   elapsed,
+  AGENT_KEYWORDS,
 } from "../../utils/agentHelpers";
 import { getCurrentView } from "../../utils/viewManager";
 import { withTimeout } from "../../utils/safeFetch";
@@ -378,11 +379,23 @@ async function infoNode(s: LayerInfoStateType, config?: RunnableConfig) {
     };
   }
 
-  // ── Bail out: PointCloudAgent territory ──
-  if (/\b(class[\s_-]?code|classification|color\s*by|point\s*size|point\s*density|points?\s*per\s*inch|return[\s_-]?number)\b/i.test(text) ||
-      (/\bfilter\b/i.test(text) && /\b(class|elevation|intensity|return|ground|vegetation|building|water|noise)\b/i.test(text))) {
-    console.log("[LayerInfo] Skipping — PointCloudAgent territory.");
-    return { outputMessage: "" };
+  // ── Bail out if another agent owns this request ──
+  const bailouts = [
+    { pattern: AGENT_KEYWORDS.imagery, label: "ImageryToolsAgent" },
+    { pattern: AGENT_KEYWORDS.measurement, label: "MeasurementAgent" },
+    { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
+    { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
+    { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
+    { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
+    { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
+    { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
+    { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
+  ];
+  for (const { pattern, label } of bailouts) {
+    if (pattern.test(text)) {
+      console.log(`[LayerInfo] Skipping — ${label} territory.`);
+      return { outputMessage: "" };
+    }
   }
 
   // ── Create/configure popup with specific fields ──

@@ -3,7 +3,7 @@ import type { RunnableConfig } from "@langchain/core/runnables";
 import { sendTraceMessage } from "@arcgis/ai-components/utils/index.js";
 import type { AgentRegistration, ChatHistory } from "@arcgis/ai-components/utils/index.js";
 import { getCurrentView, getCurrentViewType, onViewChange, requestViewSwitch } from "../../utils/viewManager";
-import { extractLastUserText , elapsed } from "../../utils/agentHelpers";
+import { extractLastUserText, elapsed, AGENT_KEYWORDS } from "../../utils/agentHelpers";
 import Collection from "@arcgis/core/core/Collection";
 import ElevationProfileLineGround from "@arcgis/core/analysis/ElevationProfile/ElevationProfileLineGround";
 import ElevationProfileLineScene from "@arcgis/core/analysis/ElevationProfile/ElevationProfileLineScene";
@@ -204,6 +204,25 @@ async function measurementNode(s: MeasurementStateType, config?: RunnableConfig)
   const text = extractLastUserText(s);
   const t0 = performance.now();
   console.log("[Measurement] Starting. User text:", text);
+
+  // ── Bail out if another agent owns this request ──
+  const bailouts = [
+    { pattern: AGENT_KEYWORDS.imagery, label: "ImageryToolsAgent" },
+    { pattern: AGENT_KEYWORDS.elevationOffset, label: "ElevationOffsetAgent" },
+    { pattern: AGENT_KEYWORDS.elevationOffsetSimple, label: "ElevationOffsetAgent" },
+    { pattern: AGENT_KEYWORDS.pointCloud, label: "PointCloudAgent" },
+    { pattern: AGENT_KEYWORDS.swipe, label: "SwipeAgent" },
+    { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
+    { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
+    { pattern: AGENT_KEYWORDS.search, label: "ContentSearchAgent" },
+    { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
+  ];
+  for (const { pattern, label } of bailouts) {
+    if (pattern.test(text)) {
+      console.log(`[Measurement] Skipping — ${label} territory.`);
+      return { outputMessage: "" };
+    }
+  }
 
   const view = getCurrentView() as any;
   if (!view) {

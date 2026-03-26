@@ -49,8 +49,8 @@ export function is3DItemType(itemType: string): boolean {
 // Centralized here so keyword changes only need to happen in one place.
 
 export const AGENT_KEYWORDS = {
-  imagery: /\b(stretch|std\s*dev|standard\s*deviation|min[\s-]*max|percent[\s-]*clip|histogram\s*equal|sigmoid|color\s*ramp|inferno|viridis|grayscale|ndvi|savi|ndwi|ndbi|ndsi|nbr|hillshade|slope|aspect|curvature|identify|pixel\s*values?|popup|screenshot|raster\s*function|processing\s*template|render|visualize|color\s*ir|false\s*color|spectral\s*index|band\s*arithmetic|imagery\s*tools|imagery\s*panel|list\s*templates?)\b/i,
-  layerInfo: /\b(describe|info|information|details|metadata|fields|attributes|schema|properties|capabilities|statistics|stats|band\s*count|pixel\s*type|sublayers?|what\s*(is|are)|tell\s*me\s*about|query|filter|where\s*clause|select\b|create\s*pop|add\s*pop|set\s*pop|configure\s*pop|pop\s*up)\b/i,
+  imagery: /\b(stretch|std\s*dev|standard\s*deviation|min[\s-]*max|percent[\s-]*clip|histogram\s*equal|sigmoid|color\s*ramp|inferno|viridis|grayscale|ndvi|savi|ndwi|ndbi|ndsi|nbr|hillshade|slope|aspect|curvature|identify|pixel\s*values?|popup|screenshot|raster\s*function|processing\s*templates?|render|visualize|color\s*ir|false\s*color|spectral\s*index|band\s*arithmetic|imagery\s*tools|imagery\s*panel|list\s*(?:processing\s*)?templates?|apply\s+\d+|apply\s+"[^"]+"|apply\s+\w+\s+template)\b/i,
+  layerInfo: /\b(describe|info|information|details|metadata|fields|attributes|schema|properties|capabilities|statistics|stats|band\s*count|pixel\s*type|sublayers?|what\s*(is|are)|tell\s*me\s*about|query|where\s*clause|select\b|create\s*pop|add\s*pop|set\s*pop|configure\s*pop|pop\s*up)\b/i,
   measurement: /\b(measure|measurement|measuring|ruler|elevation\s*profile|cross[- ]?section|distance|area|volume|cut\s*(?:and|&)?\s*fill|stockpile|excavat|earthwork|grading|how\s*far)\b/i,
   elevationOffset: /\b(fix|adjust|correct|offset|raise|lower|shift)\s*(the\s+)?(elevation|height|altitude|z[- ]?offset|vertical|floating|underground|mesh|layer)|\b(raise|lower|lift|drop)\s*(by|it)?\s*\d|\bcalculate\s*offset/i,
   elevationOffsetSimple: /\b(floating|underground|misaligned)\b/i,

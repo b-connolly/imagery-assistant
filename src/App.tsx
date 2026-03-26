@@ -21,7 +21,7 @@ import {
 import ViewToggle from "./components/ViewToggle";
 import AgentElement from "./components/AgentElement";
 // discovery
-import { ContentSearchAgent } from "./agents/discovery/ContentSearchAgent";
+import { ContentSearchAgent } from "./agents/discovery/contentSearch";
 import { LoadLayerAgent } from "./agents/discovery/LoadLayerAgent";
 // visualization
 import { ImageryToolsAgent } from "./agents/visualization/ImageryToolsAgent";
@@ -435,10 +435,90 @@ export default function App() {
     });
   }, []);
 
-  // Ref callback: listen for AI model errors (403 = org doesn't have AI Models license)
+  // Ref callback: configure assistant properties and listen for errors
   const assistantRefCallback = useCallback(
     (el: HTMLElement | null) => {
       if (!el) return;
+      // React 18 doesn't pass object/array props to custom elements as properties
+      const assistant = el as any;
+      // Clear the entry message after the first user prompt
+      el.addEventListener("arcgisSubmit", () => {
+        const entrySlot = el.querySelector('[slot="entry-message"]');
+        if (entrySlot) entrySlot.remove();
+      }, { once: true });
+      const searchPrompts = [
+        "Search My Content",
+        "Search My Organization",
+        "Search ArcGIS Online",
+        "Search ArcGIS Living Atlas",
+      ];
+      const resultPrompts = [
+        "Add Result 1",
+        "Add All Results",
+      ];
+      assistant.suggestedPrompts = searchPrompts;
+      assistant.keepSuggestedPrompts = true;
+
+      // Layer-type → contextual prompt buttons
+      const layerPrompts: Record<string, string[]> = {
+        // Imagery & raster
+        "imagery":       ["Change Stretch", "List Processing Templates", "Add Pop Up Info", "Describe Layer", "Remove All Layers"],
+        "imagery-tile":  ["Change Stretch", "List Processing Templates", "Add Pop Up Info", "Describe Layer", "Remove All Layers"],
+        // Feature
+        "feature":       ["Query Layer", "Add Pop Up Info", "Filter Layer", "Describe Layer", "Remove All Layers"],
+        // 3D scene types
+        "scene":         ["Fix Elevation", "Describe Layer", "Remove All Layers"],
+        "point-cloud":   ["Fix Elevation", "Change Density", "Change Rendering", "Describe Layer", "Remove All Layers"],
+        "gaussian-splat":["Fix Elevation", "Describe Layer", "Remove All Layers"],
+        "integrated-mesh":["Fix Elevation", "Describe Layer", "Remove All Layers"],
+        "building-scene":["Fix Elevation", "Describe Layer", "Remove All Layers"],
+        "3d-object":     ["Fix Elevation", "Describe Layer", "Remove All Layers"],
+        // Oriented Imagery
+        "oriented-imagery": ["Open Imagery Viewer", "Add Pop Up Info", "Describe Layer", "Remove All Layers"],
+        // Catalog
+        "catalog":       ["Filter Layer", "Add Pop Up Info", "Describe Layer", "Remove All Layers"],
+        // Elevation
+        "elevation":     ["Change Stretch", "List Processing Templates", "Add Pop Up Info", "Describe Layer", "Remove All Layers"],
+        // Tile & map
+        "vector-tile":   ["Describe Layer", "Remove All Layers"],
+        "tile":          ["Describe Layer", "Remove All Layers"],
+        "map-image":     ["Describe Layer", "Remove All Layers"],
+        // Web Map / Scene (loaded via view switch, not as layers)
+        "web-map":       ["Describe Layer", "Remove All Layers"],
+        "web-scene":     ["Describe Layer", "Remove All Layers"],
+        // OGC & file types
+        "wms":           ["Describe Layer", "Remove All Layers"],
+        "wmts":          ["Describe Layer", "Remove All Layers"],
+        "wfs":           ["Describe Layer", "Remove All Layers"],
+        "geojson":       ["Describe Layer", "Remove All Layers"],
+        "csv":           ["Describe Layer", "Remove All Layers"],
+        "kml":           ["Describe Layer", "Remove All Layers"],
+      };
+
+      // Track the last search scope for "Search again" functionality
+      let lastSearchScope = "";
+
+      // Switch prompts when search results arrive or layers are added
+      window.addEventListener("imagery-assistant-search-results", ((evt: CustomEvent) => {
+        lastSearchScope = evt.detail?.scope ?? "";
+        const scopeLabel = lastSearchScope
+          ? lastSearchScope.replace("my-content", "My Content")
+              .replace("my-org", "My Organization")
+              .replace("agol", "ArcGIS Online")
+              .replace("living-atlas", "ArcGIS Living Atlas")
+              .replace("all", "All Sources")
+          : "";
+        const searchAgainPrompt = scopeLabel ? `Search ${scopeLabel}` : "Search My Content";
+        assistant.suggestedPrompts = [...resultPrompts, searchAgainPrompt];
+      }) as EventListener);
+      window.addEventListener("imagery-assistant-layers-added", ((evt: CustomEvent) => {
+        const layerType: string = evt.detail?.layerType ?? "";
+        const prompts = layerPrompts[layerType];
+        assistant.suggestedPrompts = prompts ?? searchPrompts;
+      }) as EventListener);
+      window.addEventListener("imagery-assistant-layers-removed", () => {
+        assistant.suggestedPrompts = searchPrompts;
+      });
       el.addEventListener("arcgisError", ((evt: CustomEvent) => {
         const msg = evt.detail?.message ?? evt.detail?.error?.message ?? String(evt.detail);
         console.error("[App] Assistant error:", msg);
@@ -600,21 +680,29 @@ export default function App() {
               reference-element={`#${mapElementId}`}
               heading="Imagery Data Assistant"
             >
-              <arcgis-assistant-help-agent />
+              <div slot="entry-message">
+                I can help you <b>search and discover</b> geospatial content across ArcGIS,{" "}
+                <b>visualize</b> imagery, point clouds, 3D meshes, and oriented imagery,{" "}
+                and <b>analyze</b> with measurements, layer comparison, and elevation tools.
+                <br /><br />
+                What content would you like to explore?
+              </div>
               {/* Built-in navigation agent removed — only supports arcgis-map (2D),
                   crashes on SceneView. LoadLayerAgent handles geocoding instead. */}
               <arcgis-assistant-data-exploration-agent />
               {/* Custom agents — AgentElement sets the agent property imperatively (React 18 compat) */}
-              <AgentElement agent={ContentSearchAgent} />
-              <AgentElement agent={LoadLayerAgent} />
+              {/* Action agents first — faster routing for common operations */}
+              <AgentElement agent={ElevationOffsetAgent} />
               <AgentElement agent={ImageryToolsAgent} />
+              <AgentElement agent={LoadLayerAgent} />
               <AgentElement agent={PointCloudAgent} />
-              <AgentElement agent={OrientedImageryAgent} />
-              <AgentElement agent={CatalogLayerAgent} />
+              <AgentElement agent={MeasurementAgent} />
               <AgentElement agent={SwipeAgent} />
               <AgentElement agent={LayerInfoAgent} />
-              <AgentElement agent={MeasurementAgent} />
-              <AgentElement agent={ElevationOffsetAgent} />
+              <AgentElement agent={OrientedImageryAgent} />
+              <AgentElement agent={CatalogLayerAgent} />
+              {/* Search/discovery last — has LLM node that adds latency */}
+              <AgentElement agent={ContentSearchAgent} />
             </arcgis-assistant>
           ) : (
             <div className="sign-in-panel">

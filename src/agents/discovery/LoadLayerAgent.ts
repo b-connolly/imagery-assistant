@@ -138,6 +138,7 @@ const createLoadLayerGraph = () => {
         const count = layers.length;
         activeView.map.layers.removeAll();
         console.log("[LoadLayer] Removed all", count, "layers.");
+        window.dispatchEvent(new CustomEvent("imagery-assistant-layers-removed"));
         return { outputMessage: `Removed all ${count} layer${count > 1 ? "s" : ""} from the map.` };
       }
 
@@ -160,6 +161,9 @@ const createLoadLayerGraph = () => {
         const title = target.title || "Untitled";
         activeView.map.layers.remove(target);
         console.log("[LoadLayer] Removed layer:", title);
+        if (activeView.map.layers.length === 0) {
+          window.dispatchEvent(new CustomEvent("imagery-assistant-layers-removed"));
+        }
         return { outputMessage: `Removed "${title}" from the map.` };
       }
 
@@ -682,6 +686,6 @@ export const LoadLayerAgent: AgentRegistration = {
     "zoom to, fly to, go to, navigate to, focus on, extent, " +
     "web map, web scene, 2d map, 3d scene, switch to 3d, switch to 2d, toggle 3d, toggle 2d, change to scene, change to map. " +
     "Do NOT use for adjusting elevation, offset, stretch, or other properties of already-loaded layers.",
-  createGraph: createLoadLayerGraph,
+  createGraph: createLoadLayerGraph as () => any,
   workspace: LoadLayerState,
 };
