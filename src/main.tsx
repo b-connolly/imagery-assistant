@@ -19,6 +19,15 @@ import "@esri/calcite-components/components/calcite-option";
 import "@esri/calcite-components/components/calcite-option-group";
 import "@esri/calcite-components/components/calcite-label";
 import "@esri/calcite-components/components/calcite-checkbox";
+import "@esri/calcite-components/components/calcite-dialog";
+import "@esri/calcite-components/components/calcite-alert";
+import "@esri/calcite-components/components/calcite-input";
+import "@esri/calcite-components/components/calcite-input-text";
+import "@esri/calcite-components/components/calcite-text-area";
+import "@esri/calcite-components/components/calcite-notice";
+import "@esri/calcite-components/components/calcite-popover";
+import "@esri/calcite-components/components/calcite-switch";
+import "@esri/calcite-components/components/calcite-tooltip";
 
 // ArcGIS Map component registrations
 import "@arcgis/map-components/main.css";

@@ -28,6 +28,12 @@ import { ContentSearchAgent } from "./agents/discovery/contentSearch";
 import { LoadLayerAgent } from "./agents/discovery/loadLayer";
 // tools (consolidated — handles imagery, point cloud, elevation, measurement, swipe, layer info, etc.)
 import { MapToolsAgent } from "./agents/mapTools";
+// ralouta agents
+import { registerMcpPassthroughAgent, refreshMcpAgentDescription } from "./agents/McpPassthroughAgent";
+import { registerCreateFeatureLayerAgent } from "./agents/CreateFeatureLayerAgent";
+import { registerManageFeatureLayerAgent } from "./agents/ManageFeatureLayerAgent";
+import { resolveArcgisMcpBaseUrl } from "./utils/arcgisMcp";
+import HubServerManager from "./components/HubServerManager";
 
 // Global default — zoomed out to show the full world
 const DEFAULT_CENTER = [0, 20];
@@ -48,6 +54,8 @@ export default function App() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [showHubManager, setShowHubManager] = useState(false);
+  const [mcpHubRefreshToken, setMcpHubRefreshToken] = useState(0);
 
   // The web map item ID used by the assistant for embeddings storage (not for the map view)
   // assistantItemId removed — using DEFAULT_WEBMAP_ID constant instead
@@ -578,6 +586,14 @@ export default function App() {
         templatePrompts.push("Change Stretch");
         assistant.suggestedPrompts = templatePrompts;
       }) as EventListener);
+      // Register ralouta agents (imperative pattern)
+      registerMcpPassthroughAgent(el, {
+        baseUrl: resolveArcgisMcpBaseUrl(),
+        serverName: "MCP Hub",
+      });
+      registerCreateFeatureLayerAgent(el, {});
+      registerManageFeatureLayerAgent(el);
+
       el.addEventListener("arcgisError", ((evt: CustomEvent) => {
         const msg = evt.detail?.message ?? evt.detail?.error?.message ?? String(evt.detail);
         console.error("[App] Assistant error:", msg);
@@ -621,6 +637,7 @@ export default function App() {
   const mapElementId = viewType === "2d" ? "main-map" : "main-scene";
 
   return (
+    <>
     <calcite-shell>
       {/* Header */}
       <div slot="header" className="app-header">
@@ -679,6 +696,10 @@ export default function App() {
                     <calcite-icon icon="save-as" scale="s" /> Save As
                   </button>
                   <div style={{ borderTop: "1px solid #404040", margin: "6px 0" }} />
+                  <button className="user-menu-item" onClick={() => setShowHubManager(true)}>
+                    <calcite-icon icon="gear" scale="s" /> MCP Servers
+                  </button>
+                  <div style={{ borderTop: "1px solid #404040", margin: "6px 0" }} />
                   <button className="user-menu-item" onClick={signOut}>
                     <calcite-icon icon="sign-out" scale="s" /> Sign Out
                   </button>
@@ -709,9 +730,9 @@ export default function App() {
               center={`${DEFAULT_CENTER[0]},${DEFAULT_CENTER[1]}`}
               zoom={DEFAULT_ZOOM}
             >
-              <arcgis-home position="top-left" scale="l" />
-              <arcgis-zoom position="top-left" scale="l" />
-              <arcgis-compass position="top-left" />
+              <arcgis-home slot="top-left" />
+              <arcgis-zoom slot="top-left" />
+              <arcgis-compass slot="top-left" />
             </arcgis-map>
           ) : (
             <arcgis-scene
@@ -722,14 +743,15 @@ export default function App() {
               basemap={webSceneId ? undefined : "dark-gray-vector"}
               ground={webSceneId ? undefined : "world-elevation"}
             >
-              <arcgis-home position="top-left" scale="l" />
-              <arcgis-zoom position="top-left" scale="l" />
-              <arcgis-compass position="top-left" />
+              <arcgis-home slot="top-left" />
+              <arcgis-zoom slot="top-left" />
+              <arcgis-compass slot="top-left" />
             </arcgis-scene>
           )}
         </div>
+      </div>
 
-        <div id="assistant-panel">
+      <calcite-shell-panel slot="panel-end" width-scale="l" resizable>
           {aiError && (
             <div style={{
               padding: "12px 16px",
@@ -752,9 +774,9 @@ export default function App() {
               heading="Imagery Data Assistant"
             >
               <div slot="entry-message">
-                I can help you <b>search and discover</b> geospatial content across ArcGIS,{" "}
-                <b>visualize</b> imagery, point clouds, 3D meshes, and oriented imagery,{" "}
-                and <b>analyze</b> with measurements, layer comparison, and elevation tools.
+                I can help you <b>search and discover</b> content across ArcGIS,{" "}
+                <b>interact</b> with 2D and 3D layers, perform some <b>analysis</b>,{" "}
+                and <b>save</b> your results in maps or scenes.
                 <br /><br />
                 What content would you like to explore?
               </div>
@@ -783,8 +805,7 @@ export default function App() {
               </div>
             </div>
           )}
-        </div>
-      </div>
+      </calcite-shell-panel>
       <SaveDialog
         open={showSaveDialog}
         viewType={viewType}
@@ -792,6 +813,14 @@ export default function App() {
         onSave={handleSave}
         onCancel={() => setShowSaveDialog(false)}
         saving={saving}
+      />
+    </calcite-shell>
+      <HubServerManager
+        open={showHubManager}
+        onClose={() => setShowHubManager(false)}
+        onServersChanged={() => {
+          setMcpHubRefreshToken((v) => v + 1);
+        }}
       />
       {saveMessage && (
         <calcite-alert
@@ -804,6 +833,6 @@ export default function App() {
           <div slot="message">{saveMessage}</div>
         </calcite-alert>
       )}
-    </calcite-shell>
+    </>
   );
 }

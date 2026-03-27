@@ -14,6 +14,15 @@ declare namespace JSX {
     "calcite-dropdown-item": any;
     "calcite-action": any;
     "calcite-popover": any;
+    "calcite-alert": any;
+    "calcite-modal": any;
+    "calcite-label": any;
+    "calcite-input": any;
+    "calcite-text-area": any;
+    "calcite-combobox": any;
+    "calcite-combobox-item": any;
+    "calcite-dialog": any;
+    "calcite-notice": any;
     // ArcGIS Map components
     "arcgis-map": any;
     "arcgis-scene": any;
