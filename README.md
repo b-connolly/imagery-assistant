@@ -14,7 +14,7 @@ This project was inspired by and built upon the foundational work of [ralouta/Ar
 
 ## Disclaimer
 
-This app has been developed with the assistance of AI coding agents. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is for testing new AI Agent capabilities in ArcGIS Maps SDK for JS. Some features are not fully complete and there are limitations to phrasing at this time.
+This app has been developed with the assistance of AI coding agents. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is for testing new AI Agent capabilities and custom agent development using ArcGIS Maps SDK for JS. Some features are not fully complete and there are limitations to phrasing at this time.
 
 ## What It Does
 
@@ -222,14 +222,3 @@ npm run preview   # Preview production build
 - **Built-in data exploration agent** — only supports 2D for querying feature layers. Does not work in 3D SceneView.
 - **React 18 custom element props** — React 18 does not pass object props to web components as properties (fixed in React 19). The `AgentElement` wrapper handles this by setting the `agent` property imperatively.
 - **Save requires ArcGIS Online access** — saving web maps/scenes requires write permissions to your ArcGIS Online content.
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| Sign-in fails | Check OAuth client ID and redirect URLs in `.env.local` |
-| "WebMap portal item is missing" | The default web map ID in `arcgisAuth.ts` may be inaccessible. Create a new empty web map and update `DEFAULT_WEBMAP_ID`. |
-| Layers won't load | Verify the service URL is accessible and the item is shared with your account |
-| Volume measurement requires 3D | The agent auto-switches to 3D — if it fails, toggle to Scene view manually |
-| Save fails | Ensure you are signed in and have write access to your ArcGIS Online content |
-| Agent responds with tutorial text | The orchestrator may be routing to an unintended agent. Check console for which agent handled the request. |
