@@ -1,6 +1,12 @@
 # Imagery Data Assistant
 
-React + Vite app built with ArcGIS Maps SDK, ArcGIS AI Assistant components, and custom LangGraph agents for imagery and geospatial data workflows.
+An AI-powered geospatial assistant built with ArcGIS Maps SDK for JavaScript v5, ArcGIS AI Assistant components, and custom LangGraph agents. Search, load, visualize, analyze, and save geospatial content through natural language.
+
+## Demo
+
+A live demo is hosted on AWS S3: **[Imagery Data Assistant Demo](https://esri-imagery-apps.s3.dualstack.us-west-1.amazonaws.com/apps/imagery-assistant/index.html)**
+
+Sign in with your ArcGIS Online account to explore the full capabilities.
 
 ## Acknowledgments
 
@@ -8,112 +14,198 @@ This project was inspired by and built upon the foundational work of [ralouta/Ar
 
 ## Disclaimer
 
-This app has been developed with the assistance of AI coding agents. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is just for testing new AI Agent capabilities in ArcGIS Maps SDK for JS. Some features are not fully complete and there are limitations to phrasing at this time.
+This app has been developed with the assistance of AI coding agents. Review the code, configuration, and deployment choices before using it beyond demos or internal experimentation. This application is for testing new AI Agent capabilities in ArcGIS Maps SDK for JS. Some features are not fully complete and there are limitations to phrasing at this time.
 
 ## What It Does
 
-- Sign in with ArcGIS and work with 2D maps or 3D scenes.
-- Search your ArcGIS Online organization for imagery, elevation, and other content.
-- Load layers by URL, item ID, or natural-language search.
-- Perform measurements: distance, area, volume, and elevation profiles.
-- Run raster analysis with server-side processing templates and stretches.
-- Compare layers side-by-side with a swipe tool.
-- Query layer metadata, fields, statistics, and service capabilities.
-- Adjust elevation offsets for 3D layers (auto-fix, click-to-fix, or manual).
-- Visualize and filter point clouds by classification, color, and density.
-- View oriented imagery with coverage footprints and image galleries.
+- **Search and discover** geospatial content across ArcGIS Online, your organization, and the Living Atlas.
+- **Load** any ArcGIS layer type by URL, item ID, or natural-language search.
+- **Navigate** to places by name in 2D and 3D via geocoding.
+- **Visualize** imagery with stretches, color ramps, and server-side processing templates.
+- **Analyze** with distance, area, volume, and elevation profile measurements.
+- **Compare** layers side-by-side with a swipe tool.
+- **Inspect** layer metadata, fields, statistics, and service capabilities.
+- **Manage 3D content** — fix elevation offsets, visualize point clouds, view oriented imagery.
+- **Save and manage maps** — save your work as a Web Map or Web Scene to ArcGIS Online.
+- **Toggle between 2D and 3D** views with automatic layer and viewpoint transfer.
 
-## Custom Agents
+## Architecture
 
-This app relies heavily on custom agent development following this [resource](https://developers.arcgis.com/javascript/latest/agentic-apps/ai-custom-agents/).
+The app uses 3 consolidated custom agents, each following ArcGIS SDK best practices for agent development:
 
-| Agent | Group | Description |
+### Custom Agents
+
+| Agent | Pattern | Description |
 |---|---|---|
-| **ContentSearchAgent** | Discovery | Searches ArcGIS Online for imagery, elevation, and geospatial content with smart filtering |
-| **LoadLayerAgent** | Discovery | Loads layers by URL or item ID — supports Feature, Imagery, Scene, Tile, WMS, and elevation services |
-| **ImageryToolsAgent** | Visualization | Applies stretches, color ramps, server-side processing templates, and pixel identification |
-| **PointCloudAgent** | Visualization | Controls point cloud layer styling — classification filtering, color by elevation/intensity/RGB |
-| **OrientedImageryAgent** | Visualization | Opens the Oriented Imagery viewer for street-level and oblique imagery |
-| **CatalogLayerAgent** | Visualization | Interactive filtering for items in Catalog Layers by layer type |
-| **SwipeAgent** | Analysis | Enables layer comparison with a leading/trailing swipe tool |
-| **LayerInfoAgent** | Analysis | Queries layer metadata, fields, statistics, layer order, and service capabilities |
-| **MeasurementAgent** | Analysis | Activates distance, area, volume, and elevation profile tools in 2D and 3D |
-| **ElevationOffsetAgent** | Analysis | Fixes 3D layer vertical alignment with auto-fix, click-to-fix, and manual offset |
+| **ContentSearchAgent** | Multi-node (Router + LLM + ToolNode) | Searches ArcGIS Online across scopes (My Content, My Org, AGOL, Living Atlas). Returns results with contextual "Add Result" buttons. Handles type filtering for imagery, point clouds, web maps, etc. |
+| **LoadLayerAgent** | Multi-node (Router + LLM + ToolNode) | Loads/removes layers from URLs or item IDs. Geocodes place names for navigation. Loads saved Web Maps and Web Scenes. Auto-switches to 3D for 3D-only layer types. |
+| **MapToolsAgent** | Single-node dispatcher | Routes to 9 handler functions for visualization and analysis tools. Handles save/clear map commands. |
 
-## Local Development Requirements
+### MapToolsAgent Handlers
 
-- Node.js 18+
-- An ArcGIS Online account with OAuth credentials
+| Handler | Capabilities |
+|---|---|
+| **imagery** | Stretches, color ramps, processing templates, pixel identification |
+| **pointCloud** | Classification filtering, symbology (elevation, intensity, RGB, class code), point size/density |
+| **elevationOffset** | Auto-fix, click-to-fix, manual offset, elevation diagnostics |
+| **measurement** | Distance, area, volume (cut & fill), elevation profile |
+| **swipe** | Layer comparison with horizontal/vertical swipe tool |
+| **layerInfo** | Metadata, fields, statistics, popup configuration, layer listing |
+| **orientedImagery** | Oriented Imagery viewer panel with navigation and image gallery |
+| **catalog** | Catalog layer filter panel by item type |
+| **save** | Save/Save As web maps and web scenes, clear map |
 
-## Local Setup
+### Built-in Agents
 
-### 1. Clone The Repository
+| Agent | Notes |
+|---|---|
+| **Data Exploration** | Queries features, statistics, and spatial proximity in 2D web maps (built-in, 2D only) |
 
-```bash
-git clone https://github.com/b-connolly/imagery-assistant.git
-cd imagery-assistant
+### Agent Routing
+
+Agents use a keyword-based bailout system to avoid conflicts. Each agent checks `AGENT_KEYWORDS` patterns and returns empty if the request belongs to another agent. The orchestrator tries agents in registration order; empty responses signal "not my job."
+
+```
+User prompt → Orchestrator → tries each agent:
+  ContentSearchAgent: "search my content" → handles it
+  LoadLayerAgent: "search my content" → bails (search keyword → ContentSearch territory)
+  MapToolsAgent: "search my content" → bails (search keyword → ContentSearch territory)
 ```
 
-### 2. Install Dependencies
+### Project Structure
 
-```bash
-npm install
+```
+src/
+├── agents/
+│   ├── discovery/
+│   │   ├── contentSearch/          # Multi-node: router → LLM → ToolNode
+│   │   │   ├── nodes/             # Router, LLM prompt, tool execution
+│   │   │   └── tools/             # searchContent, addResults (adapter + core)
+│   │   └── loadLayer/              # Multi-node: router → LLM → ToolNode
+│   │       ├── nodes/             # Router, LLM prompt, tool execution
+│   │       └── tools/             # loadLayer, removeLayer, zoomToLayer, geocodePlace
+│   └── mapTools/                   # Single-node dispatcher
+│       ├── mapToolsNode.ts        # Routes to handlers via keyword matching
+│       └── handlers/              # imagery, pointCloud, elevationOffset, measurement,
+│                                  # swipe, layerInfo, orientedImagery, catalog, save
+├── components/
+│   ├── AgentElement.tsx           # React 18 wrapper for arcgis-assistant-agent
+│   ├── SaveDialog.tsx             # Save map dialog with folder selection
+│   ├── ViewToggle.tsx             # 2D/3D toggle control
+│   └── ErrorBoundary.tsx
+├── utils/
+│   ├── arcgisAuth.ts              # OAuth, portal, default web map config
+│   ├── viewManager.ts             # View state, switching, layer transfer
+│   ├── saveMap.ts                 # Save/update Web Maps and Web Scenes
+│   ├── portalSearch.ts            # Portal search across scopes
+│   ├── layerFactory.ts            # Layer creation from URLs and item IDs
+│   ├── rasterFunctions.ts         # Stretch, template, and identify utilities
+│   ├── agentHelpers.ts            # AGENT_KEYWORDS, shared utilities
+│   ├── typeFilterRegistry.ts      # Portal type → keyword mapping
+│   └── safeFetch.ts               # Fetch with timeout and error handling
+└── App.tsx                        # Main app, view management, contextual prompts
 ```
 
-### 3. Configure ArcGIS OAuth
+## Save Workflow
 
-1. Create an ArcGIS OAuth app at [developers.arcgis.com](https://developers.arcgis.com).
-2. Add redirect URLs: `http://localhost:5173` and `http://localhost:4173`.
-3. Update the client ID in `src/utils/arcgisAuth.ts`.
+The app starts with a read-only default web map (for AI orchestrator embeddings). Users work with an empty basemap and add content as needed.
 
-### 4. Run The App
+| Command | Behavior |
+|---|---|
+| `save web map My Project` | Creates a new Web Map portal item titled "My Project" |
+| `save web map` (after first save) | Updates the existing saved map in place |
+| `save web scene My 3D Project` | Creates a new Web Scene portal item |
+| `clear map` | Removes all layers, resets to empty default map |
 
-```bash
-npm run dev
-```
+The Save As dialog (accessible from the user menu) supports folder selection and creating new folders.
 
-## Build Commands
+## Contextual Prompt Buttons
 
-```bash
-npm run dev       # Start development server
-npm run build     # Production build
-npm run preview   # Preview production build
-```
+The assistant shows context-aware suggested prompts based on the current state:
 
-## Using The App
+| State | Buttons shown |
+|---|---|
+| **No layers** | Search My Content, Search My Organization, Search ArcGIS Online, Search ArcGIS Living Atlas |
+| **After search results** | Add Result 1, Add All Results, [scope] |
+| **After listing templates** | Apply 1, Apply 2, Apply 3, Change Stretch |
+| **After adding a layer** | Layer-type-specific tools (e.g., Change Stretch, Fix Elevation, Describe Layer, Remove All Layers) |
 
-1. Sign in with your ArcGIS Online account.
-2. Toggle between 2D Map and 3D Scene views.
-3. Ask the assistant to find, load, analyze, or measure geospatial data.
-
-Example prompts:
+## Example Prompts
 
 **Search & load**
-- `search my content for oriented imagery layers`
-- `find elevation services`
+- `search my content for gaussian splat layers`
+- `search Living Atlas for elevation data`
+- `add result 1`
+- `add all results`
 - `load this layer: https://services.arcgis.com/.../FeatureServer`
-- `add the layer with item id abc123`
+
+**Navigation**
+- `zoom to Denver CO`
+- `go to Tokyo`
+- `fly to the Grand Canyon`
+
+**Imagery analysis**
+- `list processing templates`
+- `apply 5`
+- `apply NDVI to the satellite imagery layer`
+- `change stretch to standard deviation`
 
 **Measurement**
 - `measure distance in kilometers`
 - `measure area in acres`
 - `show an elevation profile`
-- `measure volume`
-
-**Imagery analysis**
-- `apply NDVI to the satellite imagery layer`
-- `apply the hillshade template`
-- `identify pixels on click`
-
-**Layer info & comparison**
-- `what fields does the oriented imagery layer have?`
-- `describe layer`
-- `swipe between the two imagery layers`
+- `measure volume using cut and fill`
 
 **3D & point cloud**
-- `fix the floating mesh`
-- `show only ground and buildings`
-- `change point cloud density to 100%`
+- `fix elevation`
+- `filter point cloud class code 2`
+- `color by elevation`
+- `change point cloud density to 100`
+
+**Layer info & comparison**
+- `describe layer`
+- `what fields does this layer have?`
+- `swipe between the two imagery layers`
+- `add pop up info`
+
+**Save & manage**
+- `save web map Denver Imagery`
+- `save web scene My 3D Scene`
+- `clear map`
+- `remove all layers`
+
+## Local Development
+
+### Requirements
+
+- Node.js 18+
+- An ArcGIS Online account with OAuth credentials
+
+### Setup
+
+```bash
+git clone https://github.com/b-connolly/imagery-assistant.git
+cd imagery-assistant
+npm install
+```
+
+Create `.env.local`:
+```
+VITE_ARCGIS_OAUTH_APP_ID=your_oauth_app_id
+VITE_ARCGIS_PORTAL_URL=https://www.arcgis.com
+```
+
+```bash
+npm run dev       # Start development server (http://localhost:5173)
+npm run build     # Production build
+npm run preview   # Preview production build
+```
+
+### OAuth Setup
+
+1. Create an OAuth app at [developers.arcgis.com](https://developers.arcgis.com).
+2. Add redirect URLs: `http://localhost:5173` and `http://localhost:4173`.
+3. Set the client ID in `.env.local`.
 
 ## Tech Stack
 
@@ -124,3 +216,20 @@ Example prompts:
 - [React 18](https://react.dev/) + [Vite 7](https://vite.dev/)
 - [TypeScript](https://www.typescriptlang.org/)
 
+## Known Limitations
+
+- **Built-in navigation agent removed** — only supports 2D and crashes in 3D SceneView. Geocoding is handled by LoadLayerAgent instead, which works in both 2D and 3D.
+- **Built-in data exploration agent** — only supports 2D for querying feature layers. Does not work in 3D SceneView.
+- **React 18 custom element props** — React 18 does not pass object props to web components as properties (fixed in React 19). The `AgentElement` wrapper handles this by setting the `agent` property imperatively.
+- **Save requires ArcGIS Online access** — saving web maps/scenes requires write permissions to your ArcGIS Online content.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Sign-in fails | Check OAuth client ID and redirect URLs in `.env.local` |
+| "WebMap portal item is missing" | The default web map ID in `arcgisAuth.ts` may be inaccessible. Create a new empty web map and update `DEFAULT_WEBMAP_ID`. |
+| Layers won't load | Verify the service URL is accessible and the item is shared with your account |
+| Volume measurement requires 3D | The agent auto-switches to 3D — if it fails, toggle to Scene view manually |
+| Save fails | Ensure you are signed in and have write access to your ArcGIS Online content |
+| Agent responds with tutorial text | The orchestrator may be routing to an unintended agent. Check console for which agent handled the request. |
