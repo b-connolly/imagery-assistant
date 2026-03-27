@@ -10,6 +10,7 @@ import { catalogHandler } from "./handlers/catalog";
 import { elevationOffsetHandler } from "./handlers/elevationOffset";
 import { imageryHandler } from "./handlers/imagery";
 import { pointCloudHandler } from "./handlers/pointCloud";
+import { saveHandler } from "./handlers/save";
 
 export async function mapToolsNode(s: MapToolsStateType, config?: RunnableConfig) {
   await sendTraceMessage({ text: "MapTools: processing request" }, config);
@@ -30,6 +31,8 @@ export async function mapToolsNode(s: MapToolsStateType, config?: RunnableConfig
 
   // Route to handlers based on intent keywords
   // Check more specific patterns first, then broader ones
+  if (/\b(save)\s+(web\s*map|web\s*scene|map|scene)\b/i.test(text)) return saveHandler(text);
+  if (/\b(clear|reset|new)\s+(web\s*)?(map|scene)\b/i.test(text)) return saveHandler(text);
   if (AGENT_KEYWORDS.elevationOffset.test(text)) return elevationOffsetHandler(text);
   if (AGENT_KEYWORDS.elevationOffsetSimple.test(text)) return elevationOffsetHandler(text);
   if (AGENT_KEYWORDS.pointCloud.test(text)) return pointCloudHandler(text);

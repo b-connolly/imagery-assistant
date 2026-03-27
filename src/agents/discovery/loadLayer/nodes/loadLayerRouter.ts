@@ -34,16 +34,18 @@ export async function loadLayerRouter(
   if (switchTo3D || switchTo2D) {
     const targetType = switchTo3D ? "3d" : "2d";
     if (getCurrentViewType() === targetType) {
-      return { outputMessage: `Already in ${targetType.toUpperCase()} view.` };
+      return { outputMessage: `Already in ${targetType.toUpperCase()} view.`, routerHandled: true };
     }
     try {
       await requestViewSwitch(targetType);
       return {
         outputMessage: `Switched to ${targetType.toUpperCase()} view.`,
+        routerHandled: true,
       };
     } catch {
       return {
         outputMessage: `Failed to switch to ${targetType.toUpperCase()}. Please use the 2D/3D toggle.`,
+        routerHandled: true,
       };
     }
   }
@@ -56,13 +58,13 @@ export async function loadLayerRouter(
     // "remove all layers"
     if (/\ball\s*(layers?|data)?\b/i.test(text)) {
       const msg = await removeLayer({ removeAll: true });
-      return { outputMessage: msg };
+      return { outputMessage: msg, routerHandled: true };
     }
 
     // Try to match a specific layer by name
     const stripped = extractRemoveLayerName(text);
     const msg = await removeLayer({ layerName: stripped, removeAll: false });
-    return { outputMessage: msg };
+    return { outputMessage: msg, routerHandled: true };
   }
 
   // ── Zoom to layer / place ──────────────────────────────────────────
@@ -72,7 +74,7 @@ export async function loadLayerRouter(
   if (zoomMatch && !/\b(load|add|open|display)\b/i.test(text)) {
     const activeView = getCurrentView();
     if (!activeView?.map) {
-      return { outputMessage: "No active map view." };
+      return { outputMessage: "No active map view.", routerHandled: true };
     }
 
     const stripped = extractZoomTarget(text);
@@ -80,7 +82,7 @@ export async function loadLayerRouter(
 
     // If zoomToLayer found a layer, return its result
     if (result !== null) {
-      return { outputMessage: result };
+      return { outputMessage: result, routerHandled: true };
     }
 
     // No layer matched — geocode as a place name (e.g., "zoom to Phoenix")
@@ -94,13 +96,13 @@ export async function loadLayerRouter(
           )
           .trim(),
     });
-    return { outputMessage: geocodeResult };
+    return { outputMessage: geocodeResult, routerHandled: true };
   }
 
   // ── Web Map / Web Scene by name ────────────────────────────────────
   const webMapResult = await tryLoadWebMapOrScene(text);
   if (webMapResult !== null) {
-    return { outputMessage: webMapResult };
+    return { outputMessage: webMapResult, routerHandled: true };
   }
 
   // ── "add result N" bailout → ContentSearch handles ─────────────────
@@ -110,7 +112,7 @@ export async function loadLayerRouter(
     /(?:add|load|open|show)\s+(?:the\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+(?:one|result|item|layer)/i.test(text)
   ) {
     console.log("[LoadLayer] Skipping — 'add result N' for ContentSearchAgent.");
-    return { outputMessage: "" };
+    return { outputMessage: "", routerHandled: true };
   }
 
   // ── Scoped content requests → ContentSearch ────────────────────────
@@ -119,7 +121,13 @@ export async function loadLayerRouter(
     /\b(search|find|browse|discover)\s+(for\s+)?(layers?|items?|content|data|services?)\b/i.test(text)
   ) {
     console.log("[LoadLayer] Skipping — scoped content search for ContentSearchAgent.");
-    return { outputMessage: "" };
+    return { outputMessage: "", routerHandled: true };
+  }
+
+  // ── Bail out: save commands belong to the app UI, not load agent ──
+  if (/\b(save)\s+(web\s*map|web\s*scene|map|scene)\b/i.test(text)) {
+    console.log("[LoadLayer] Skipping — save command.");
+    return { outputMessage: "", routerHandled: true };
   }
 
   // ── Pre-compute flags for bailout checks ──────────────────────────
@@ -144,7 +152,7 @@ export async function loadLayerRouter(
     for (const { pattern, label } of bailoutChecks) {
       if (pattern.test(text)) {
         console.log(`[LoadLayer] Skipping — ${label} territory.`);
-        return { outputMessage: "" };
+        return { outputMessage: "", routerHandled: true };
       }
     }
 
@@ -157,7 +165,7 @@ export async function loadLayerRouter(
 
     if (!hasLoadVerb && (hasOffsetKeyword || hasNumberWithUnit)) {
       console.log("[LoadLayer] Skipping — no URL/ID/load-verb, looks like offset/adjustment request.");
-      return { outputMessage: "" };
+      return { outputMessage: "", routerHandled: true };
     }
   }
 

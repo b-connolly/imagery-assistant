@@ -14,11 +14,12 @@ const createLoadLayerGraph = () => {
     .addNode("loadLayerToolCalling", loadLayerToolCalling)
     .addEdge(START, "loadLayerRouter")
     .addConditionalEdges("loadLayerRouter", (state: any) => {
-      // If the router produced output (fast-path handled it), go straight to END
-      if (state.outputMessage && state.outputMessage.trim().length > 0) {
+      // If the router handled the request (fast-path with content, or bailout),
+      // go straight to END. The router sets routerHandled=true for both cases.
+      if (state.routerHandled) {
         return "end";
       }
-      // Otherwise, route to the LLM node
+      // Otherwise, route to the LLM node for intent extraction
       return "llm";
     }, {
       end: END,

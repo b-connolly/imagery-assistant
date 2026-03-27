@@ -145,8 +145,12 @@ export async function imageryHandler(text: string): Promise<{ outputMessage: str
         }
 
         const list = templates.map((t, i) => `${i + 1}. ${t.name}`).join("\n");
+        // Notify UI to show template-specific prompt buttons
+        window.dispatchEvent(new CustomEvent("imagery-assistant-templates-listed", {
+          detail: { count: templates.length },
+        }));
         return {
-          outputMessage: `**Processing templates for "${layer.title}"** (${templates.length}):\n\n${list}\n\nSay "apply [template name]" to use one.`,
+          outputMessage: `**Processing templates for "${layer.title}"** (${templates.length}):\n\n${list}\n\nSay "apply [number]" or "apply [template name]" to use one.`,
         };
       }
 

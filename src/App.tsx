@@ -5,8 +5,8 @@ import {
   checkSignInStatus,
   getCredential,
   getPortalUser,
-  ensureWebMapItem,
   signOut,
+  DEFAULT_WEBMAP_ID,
 } from "./utils/arcgisAuth";
 import ElevationLayer from "@arcgis/core/layers/ElevationLayer";
 import {
@@ -20,6 +20,9 @@ import {
 } from "./utils/viewManager";
 import ViewToggle from "./components/ViewToggle";
 import AgentElement from "./components/AgentElement";
+import SaveDialog from "./components/SaveDialog";
+import { saveAsWebMap, saveAsWebScene, updateWebMap, updateWebScene, createFolder } from "./utils/saveMap";
+import { getCurrentView, getCurrentViewType } from "./utils/viewManager";
 // discovery
 import { ContentSearchAgent } from "./agents/discovery/contentSearch";
 import { LoadLayerAgent } from "./agents/discovery/loadLayer";
@@ -38,16 +41,20 @@ export default function App() {
   const [userInfo, setUserInfo] = useState<{ username: string; thumbnailUrl: string | null; orgUrl: string }>({ username: "", thumbnailUrl: null, orgUrl: "" });
   const [loading, setLoading] = useState(true);
   const [viewType, setViewType] = useState<ViewType>("2d");
-  const [webMapId, setWebMapId] = useState<string | null>(null);
+  const [webMapId, setWebMapId] = useState<string | null>(DEFAULT_WEBMAP_ID);
+  const [userSavedMapId, setUserSavedMapId] = useState<string | null>(null);
   const [webSceneId, setWebSceneId] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   // The web map item ID used by the assistant for embeddings storage (not for the map view)
-  const assistantItemId = useRef<string | null>(null);
+  // assistantItemId removed — using DEFAULT_WEBMAP_ID constant instead
 
   // Track the assistant element to register agents exactly once per mount
 
-  // Shared post-auth setup: load user profile and ensure assistant web map item
+  // Shared post-auth setup: load user profile
   const completeSignIn = useCallback(async () => {
     setSignedIn(true);
     const user = await getPortalUser();
@@ -57,9 +64,7 @@ export default function App() {
       thumbnailUrl: user.thumbnailUrl,
       orgUrl: user.orgUrl,
     });
-    const itemId = await ensureWebMapItem();
-    assistantItemId.current = itemId;
-    setWebMapId(itemId);
+    // Default web map (DEFAULT_WEBMAP_ID) is already set in state — no auto-creation needed
   }, []);
 
   // Initialize OAuth on mount
@@ -409,6 +414,55 @@ export default function App() {
     [viewType]
   );
 
+  // Save (update in place) — only works if map was loaded from a saved portal item
+  const handleUpdate = useCallback(async () => {
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      const view = getCurrentView();
+      if (!view) throw new Error("No active view");
+      const vt = getCurrentViewType();
+      const result = vt === "3d"
+        ? await updateWebScene(view as any)
+        : await updateWebMap(view as any);
+      setSaveMessage(`Updated "${result.title}".`);
+    } catch (err: any) {
+      setSaveMessage(`Save failed: ${err?.message ?? String(err)}`);
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  // Save As — create a new portal item
+  const handleSave = useCallback(async (title: string, summary: string, folderId: string, newFolderName?: string) => {
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      const view = getCurrentView();
+      if (!view) throw new Error("No active view");
+      const vt = getCurrentViewType();
+      // Create new folder if requested
+      let resolvedFolderId = folderId || undefined;
+      if (newFolderName) {
+        resolvedFolderId = await createFolder(newFolderName);
+      }
+      const opts = { summary, folderId: resolvedFolderId };
+      const result = vt === "3d"
+        ? await saveAsWebScene(view as any, title, opts)
+        : await saveAsWebMap(view as any, title, opts);
+      // Track the saved map so "Save" (update) works on subsequent saves
+      if (vt === "2d") {
+        setUserSavedMapId(result.id);
+      }
+      setSaveMessage(`Saved "${result.title}" to your content.`);
+      setShowSaveDialog(false);
+    } catch (err: any) {
+      setSaveMessage(`Save failed: ${err?.message ?? String(err)}`);
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
   // Register the view switch handler so agents can programmatically switch views
   useEffect(() => {
     registerViewSwitchHandler(handleViewToggle);
@@ -510,7 +564,20 @@ export default function App() {
       }) as EventListener);
       window.addEventListener("imagery-assistant-layers-removed", () => {
         assistant.suggestedPrompts = searchPrompts;
+        setUserSavedMapId(null);
       });
+      window.addEventListener("imagery-assistant-map-saved", ((evt: CustomEvent) => {
+        const { id, viewType: vt } = evt.detail ?? {};
+        if (id && vt === "2d") setUserSavedMapId(id);
+      }) as EventListener);
+      window.addEventListener("imagery-assistant-templates-listed", ((evt: CustomEvent) => {
+        const count = evt.detail?.count ?? 0;
+        const templatePrompts = ["Apply 1"];
+        if (count > 1) templatePrompts.push("Apply 2");
+        if (count > 2) templatePrompts.push("Apply 3");
+        templatePrompts.push("Change Stretch");
+        assistant.suggestedPrompts = templatePrompts;
+      }) as EventListener);
       el.addEventListener("arcgisError", ((evt: CustomEvent) => {
         const msg = evt.detail?.message ?? evt.detail?.error?.message ?? String(evt.detail);
         console.error("[App] Assistant error:", msg);
@@ -599,6 +666,19 @@ export default function App() {
                     <calcite-icon icon="content-full" scale="s" /> My Content
                   </a>
                   <div style={{ borderTop: "1px solid #404040", margin: "6px 0" }} />
+                  <button
+                    className="user-menu-item"
+                    onClick={handleUpdate}
+                    disabled={!userSavedMapId || saving}
+                    style={!userSavedMapId ? { opacity: 0.4, cursor: "default" } : undefined}
+                    title={!userSavedMapId ? "No saved map to update — use Save As first" : "Update the current saved map"}
+                  >
+                    <calcite-icon icon="save" scale="s" /> Save
+                  </button>
+                  <button className="user-menu-item" onClick={() => setShowSaveDialog(true)}>
+                    <calcite-icon icon="save-as" scale="s" /> Save As
+                  </button>
+                  <div style={{ borderTop: "1px solid #404040", margin: "6px 0" }} />
                   <button className="user-menu-item" onClick={signOut}>
                     <calcite-icon icon="sign-out" scale="s" /> Sign Out
                   </button>
@@ -625,10 +705,9 @@ export default function App() {
               key={webMapId || "default-map"}
               ref={mapSceneRefCallback}
               id="main-map"
-              item-id={webMapId ?? undefined}
-              basemap={webMapId ? undefined : "dark-gray-vector"}
-              center={webMapId && webMapId !== assistantItemId.current ? undefined : `${DEFAULT_CENTER[0]},${DEFAULT_CENTER[1]}`}
-              zoom={webMapId && webMapId !== assistantItemId.current ? undefined : DEFAULT_ZOOM}
+              item-id={webMapId ?? DEFAULT_WEBMAP_ID}
+              center={`${DEFAULT_CENTER[0]},${DEFAULT_CENTER[1]}`}
+              zoom={DEFAULT_ZOOM}
             >
               <arcgis-home position="top-left" scale="l" />
               <arcgis-zoom position="top-left" scale="l" />
@@ -706,6 +785,25 @@ export default function App() {
           )}
         </div>
       </div>
+      <SaveDialog
+        open={showSaveDialog}
+        viewType={viewType}
+        username={userName}
+        onSave={handleSave}
+        onCancel={() => setShowSaveDialog(false)}
+        saving={saving}
+      />
+      {saveMessage && (
+        <calcite-alert
+          open
+          kind={saveMessage.startsWith("Save failed") ? "danger" : "success"}
+          auto-close
+          auto-close-duration="medium"
+          onCalciteAlertClose={() => setSaveMessage(null)}
+        >
+          <div slot="message">{saveMessage}</div>
+        </calcite-alert>
+      )}
     </calcite-shell>
   );
 }

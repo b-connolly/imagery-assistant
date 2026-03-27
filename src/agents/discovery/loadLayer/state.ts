@@ -15,6 +15,10 @@ export const LoadLayerState = Annotation.Root({
         : current,
     default: () => "",
   }),
+  routerHandled: Annotation<boolean>({
+    reducer: (_current, update) => update ?? false,
+    default: () => false,
+  }),
 });
 
 export type LoadLayerStateType = typeof LoadLayerState.State;

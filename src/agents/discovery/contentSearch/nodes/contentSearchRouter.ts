@@ -54,7 +54,7 @@ function quickExtractAddResults(text: string): number[] | "all" | null {
     if (indices.size > 0) return [...indices].sort((a, b) => a - b);
   }
 
-  // "load the first/second/third one"
+  // "load the first/second/third"
   const ordinals: Record<string, number> = {
     first: 1,
     second: 2,
@@ -92,6 +92,12 @@ export async function contentSearchRouter(
 ): Promise<Partial<ContentSearchStateType>> {
   const text = extractLastUserText(state);
   const quickAdd = quickExtractAddResults(text);
+
+  // ── Bail out: save commands ──
+  if (/\b(save)\s+(web\s*map|web\s*scene|map|scene)\b/i.test(text)) {
+    console.log("[ContentSearch] Skipping — save command.");
+    return { outputMessage: "" };
+  }
 
   // ── Bail out if another agent owns this request ──
   if (quickAdd === null) {
