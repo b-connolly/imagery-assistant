@@ -10,12 +10,12 @@ import {
   PointFeatureDraft,
   updateFeaturesByName,
   upsertPointFeaturesByName,
-} from "../utils/featureLayerEdits";
+} from "../../utils/featureLayerEdits";
 import {
   getLastAssistantGeoSnapshot,
   getLastCreatedFeatureLayer,
-} from "../utils/assistantState";
-import { searchPortalLayerByName } from "../utils/featureServiceUtils";
+} from "../../utils/assistantState";
+import { searchPortalLayerByName } from "../../utils/featureServiceUtils";
 
 const editIntentTool = tool(
   async (args) => JSON.stringify(args),

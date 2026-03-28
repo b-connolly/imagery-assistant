@@ -1,5 +1,5 @@
-import type { CreateHostedFeatureServiceResult } from "../utils/featureServiceUtils";
-import { getCredential, createHostedFeatureService } from "../utils/featureServiceUtils";
+import type { CreateHostedFeatureServiceResult } from "../../utils/featureServiceUtils";
+import { getCredential, createHostedFeatureService } from "../../utils/featureServiceUtils";
 import { invokeToolPrompt } from "@arcgis/ai-orchestrator";
 import { HumanMessage } from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
@@ -10,11 +10,11 @@ import {
   addPointFeaturesToLayer,
   buildPointFeatureDraftsFromMemory,
   inferFieldsFromPointFeatureDrafts,
-} from "../utils/featureLayerEdits";
+} from "../../utils/featureLayerEdits";
 import {
   getLastAssistantGeoSnapshot,
   setLastCreatedFeatureLayer,
-} from "../utils/assistantState";
+} from "../../utils/assistantState";
 
 export interface CreateFeatureLayerAgentContext {
   oauthClientId?: string;

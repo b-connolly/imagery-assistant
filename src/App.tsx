@@ -29,9 +29,9 @@ import { LoadLayerAgent } from "./agents/discovery/loadLayer";
 // tools (consolidated — handles imagery, point cloud, elevation, measurement, swipe, layer info, etc.)
 import { MapToolsAgent } from "./agents/mapTools";
 // ralouta agents
-import { registerMcpPassthroughAgent, refreshMcpAgentDescription } from "./agents/McpPassthroughAgent";
-import { registerCreateFeatureLayerAgent } from "./agents/CreateFeatureLayerAgent";
-import { registerManageFeatureLayerAgent } from "./agents/ManageFeatureLayerAgent";
+import { registerMcpPassthroughAgent, refreshMcpAgentDescription } from "./agents/discovery/mcp/McpPassthroughAgent";
+import { registerCreateFeatureLayerAgent } from "./agents/mapTools/CreateFeatureLayerAgent";
+import { registerManageFeatureLayerAgent } from "./agents/mapTools/ManageFeatureLayerAgent";
 import { resolveArcgisMcpBaseUrl } from "./utils/arcgisMcp";
 import HubServerManager from "./components/HubServerManager";
 

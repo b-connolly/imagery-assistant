@@ -4,8 +4,8 @@ import { tool } from "@langchain/core/tools";
 import { StateGraph, Annotation as ANNOTATION, START, END } from "@langchain/langgraph/web";
 import { z } from "zod";
 import { buildToolPromptText, deriveGeoEntities, normalizeUrl, prioritizeRequestedGeoFocus, resolveHubServersUrl, type McpToolDef } from "./mcpAgentCore";
-import { clearMcpGeoLayer, renderMcpGeoEntities, type GeoEntity } from "../utils/mcpGeoRenderer";
-import { setLastAssistantGeoSnapshot } from "../utils/assistantState";
+import { clearMcpGeoLayer, renderMcpGeoEntities, type GeoEntity } from "../../../utils/mcpGeoRenderer";
+import { setLastAssistantGeoSnapshot } from "../../../utils/assistantState";
 
 export interface McpPassthroughAgentContext {
   baseUrl?: string;

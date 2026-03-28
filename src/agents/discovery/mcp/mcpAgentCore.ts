@@ -1,4 +1,4 @@
-import type { GeoContext, GeoEntity, GeoExtent, GeoNamedPlace, GeoPoint } from "../utils/mcpGeoRenderer";
+import type { GeoContext, GeoEntity, GeoExtent, GeoNamedPlace, GeoPoint } from "../../../utils/mcpGeoRenderer";
 
 export interface McpToolDef {
   name: string;
