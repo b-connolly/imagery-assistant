@@ -146,9 +146,9 @@ The assistant shows context-aware suggested prompts based on the current state:
 
 **Imagery analysis**
 - `list processing templates`
-- `apply 5`
-- `apply NDVI to the satellite imagery layer`
-- `change stretch to standard deviation`
+- `apply processing template Name`
+- `change stretch to min-max with DRA`
+- `compare layer 1 and layer 2`
 
 **Measurement**
 - `measure distance in kilometers`
@@ -162,15 +162,14 @@ The assistant shows context-aware suggested prompts based on the current state:
 - `color by elevation`
 - `change point cloud density to 100`
 
-**Layer info & comparison**
+**Layer query**
 - `describe layer`
 - `what fields does this layer have?`
-- `swipe between the two imagery layers`
 - `add pop up info`
 
-**Save & manage**
-- `save web map Denver Imagery`
-- `save web scene My 3D Scene`
+**Maps & Scenes**
+- `save web map Title`
+- `search my content for web scenes`
 - `clear map`
 - `remove all layers`
 
