@@ -26,6 +26,7 @@ import { getCurrentView, getCurrentViewType } from "./utils/viewManager";
 // discovery
 import { ContentSearchAgent } from "./agents/discovery/contentSearch";
 import { LoadLayerAgent } from "./agents/discovery/loadLayer";
+import { StacSearchAgent } from "./agents/discovery/stac";
 // tools (consolidated — handles imagery, point cloud, elevation, measurement, swipe, layer info, etc.)
 import { MapToolsAgent } from "./agents/mapTools";
 // ralouta agents
@@ -34,6 +35,7 @@ import { registerCreateFeatureLayerAgent } from "./agents/mapTools/CreateFeature
 import { registerManageFeatureLayerAgent } from "./agents/mapTools/ManageFeatureLayerAgent";
 import { resolveArcgisMcpBaseUrl } from "./utils/arcgisMcp";
 import HubServerManager from "./components/HubServerManager";
+import StacCatalogManager from "./components/StacCatalogManager";
 
 // Global default — zoomed out to show the full world
 const DEFAULT_CENTER = [0, 20];
@@ -55,6 +57,7 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [showHubManager, setShowHubManager] = useState(false);
+  const [showStacManager, setShowStacManager] = useState(false);
   const [mcpHubRefreshToken, setMcpHubRefreshToken] = useState(0);
 
   // The web map item ID used by the assistant for embeddings storage (not for the map view)
@@ -500,11 +503,23 @@ export default function App() {
         const entrySlot = el.querySelector('[slot="entry-message"]');
         if (entrySlot) entrySlot.remove();
       }, { once: true });
+
+      // Track suggested prompt usage — disable after 2 clicks to avoid stale handlers
+      let promptClickCount = 0;
+      const MAX_PROMPT_CLICKS = 2;
+      el.addEventListener("arcgisSubmit", () => {
+        promptClickCount++;
+        if (promptClickCount >= MAX_PROMPT_CLICKS) {
+          assistant.suggestedPrompts = [];
+          assistant.keepSuggestedPrompts = false;
+        }
+      });
       const searchPrompts = [
         "Search My Content",
         "Search My Organization",
         "Search ArcGIS Online",
         "Search ArcGIS Living Atlas",
+        "Search STAC",
       ];
       const resultPrompts = [
         "Add Result 1",
@@ -564,14 +579,29 @@ export default function App() {
           : "";
         const searchAgainPrompt = scopeLabel ? scopeLabel : "My Content";
         assistant.suggestedPrompts = [...resultPrompts, searchAgainPrompt];
+        promptClickCount = 0;
+      }) as EventListener);
+      window.addEventListener("imagery-assistant-stac-results", ((evt: CustomEvent) => {
+        const count = evt.detail?.count ?? 0;
+        const stacResultPrompts = [
+          "Add STAC Result 1",
+          count > 1 ? "Add All STAC Results" : "",
+          count > 10 ? "Show More STAC Results" : "",
+        ].filter(Boolean);
+        assistant.suggestedPrompts = stacResultPrompts;
+        assistant.keepSuggestedPrompts = true;
+        promptClickCount = 0;
       }) as EventListener);
       window.addEventListener("imagery-assistant-layers-added", ((evt: CustomEvent) => {
         const layerType: string = evt.detail?.layerType ?? "";
         const prompts = layerPrompts[layerType];
         assistant.suggestedPrompts = prompts ?? searchPrompts;
+        assistant.keepSuggestedPrompts = true;
+        promptClickCount = 0;
       }) as EventListener);
       window.addEventListener("imagery-assistant-layers-removed", () => {
         assistant.suggestedPrompts = searchPrompts;
+        promptClickCount = 0;
         setUserSavedMapId(null);
       });
       window.addEventListener("imagery-assistant-map-saved", ((evt: CustomEvent) => {
@@ -699,6 +729,9 @@ export default function App() {
                   <button className="user-menu-item" onClick={() => setShowHubManager(true)}>
                     <calcite-icon icon="gear" scale="s" /> MCP Servers
                   </button>
+                  <button className="user-menu-item" onClick={() => setShowStacManager(true)}>
+                    <calcite-icon icon="globe" scale="s" /> STAC Catalogs
+                  </button>
                   <div style={{ borderTop: "1px solid #404040", margin: "6px 0" }} />
                   <button className="user-menu-item" onClick={signOut}>
                     <calcite-icon icon="sign-out" scale="s" /> Sign Out
@@ -774,8 +807,9 @@ export default function App() {
               heading="Imagery Data Assistant"
             >
               <div slot="entry-message">
-                I can help you <b>search and discover</b> content across ArcGIS,{" "}
-                <b>interact</b> with 2D and 3D layers, perform some <b>analysis</b>,{" "}
+                I can help you <b>search and discover</b> content across <b>ArcGIS and{" "}
+                STAC</b>,{" "}
+                interact with <b>2D and 3D layers</b>, perform some <b>analysis</b>,{" "}
                 and <b>save</b> your results in maps or scenes.
                 <br /><br />
                 What content would you like to explore?
@@ -787,7 +821,9 @@ export default function App() {
               {/* MapTools first — handles most layer operations via fast regex */}
               <AgentElement agent={MapToolsAgent} />
               <AgentElement agent={LoadLayerAgent} />
-              {/* Search/discovery last — has LLM node that adds latency */}
+              {/* STAC search — external catalogs (Earth Search, Planetary Computer) */}
+              <AgentElement agent={StacSearchAgent} />
+              {/* ArcGIS portal search — has LLM node that adds latency */}
               <AgentElement agent={ContentSearchAgent} />
             </arcgis-assistant>
           ) : (
@@ -821,6 +857,10 @@ export default function App() {
         onServersChanged={() => {
           setMcpHubRefreshToken((v) => v + 1);
         }}
+      />
+      <StacCatalogManager
+        open={showStacManager}
+        onClose={() => setShowStacManager(false)}
       />
       {saveMessage && (
         <calcite-alert

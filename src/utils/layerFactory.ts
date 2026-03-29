@@ -192,6 +192,16 @@ export async function createLayerFromItemId(
 
 // ── Elevation service support ────────────────────────────────────────────────
 
+// ── COG (Cloud Optimized GeoTIFF) from direct URL ──────────────────────────
+
+/**
+ * Create an ImageryTileLayer from a Cloud Optimized GeoTIFF URL.
+ * Used for STAC catalog assets — no ArcGIS server required, just a CORS-enabled HTTPS URL.
+ */
+export function createLayerFromCogUrl(url: string, title?: string): ImageryTileLayer {
+  return new ImageryTileLayer({ url, title: title ?? "COG Layer" });
+}
+
 /**
  * Check if a portal item has elevation-related keywords in its metadata.
  * Used for display tagging only (e.g., showing an icon in search results).

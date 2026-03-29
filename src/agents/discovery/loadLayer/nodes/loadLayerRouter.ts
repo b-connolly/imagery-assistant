@@ -148,6 +148,7 @@ export async function loadLayerRouter(
       { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
       { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
       { pattern: AGENT_KEYWORDS.capabilities, label: "AllCapabilitiesAgent" },
+      { pattern: AGENT_KEYWORDS.stac, label: "StacSearchAgent" },
     ];
     for (const { pattern, label } of bailoutChecks) {
       if (pattern.test(text)) {

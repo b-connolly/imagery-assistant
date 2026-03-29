@@ -39,6 +39,7 @@ The app uses 3 consolidated custom agents, each following ArcGIS SDK best practi
 |---|---|---|
 | **ContentSearchAgent** | Multi-node (Router + LLM + ToolNode) | Searches ArcGIS Online across scopes (My Content, My Org, AGOL, Living Atlas). Returns results with contextual "Add Result" buttons. Handles type filtering for imagery, point clouds, web maps, etc. |
 | **LoadLayerAgent** | Multi-node (Router + LLM + ToolNode) | Loads/removes layers from URLs or item IDs. Geocodes place names for navigation. Loads saved Web Maps and Web Scenes. Auto-switches to 3D for 3D-only layer types. |
+| **StacSearchAgent** | Multi-node (Router + LLM + ToolNode) | Searches external STAC catalogs (Element84 Earth Search, Microsoft Planetary Computer). Filters by extent, date, cloud cover, and collection. Loads COG assets as ImageryTileLayer. Supports pagination and thumbnail previews. |
 | **MapToolsAgent** | Single-node dispatcher | Routes to 9 handler functions for visualization and analysis tools. Handles save/clear map commands. |
 
 ### MapToolsAgent Handlers
@@ -54,6 +55,27 @@ The app uses 3 consolidated custom agents, each following ArcGIS SDK best practi
 | **orientedImagery** | Oriented Imagery viewer panel with navigation and image gallery |
 | **catalog** | Catalog layer filter panel by item type |
 | **save** | Save/Save As web maps and web scenes, clear map |
+
+### STAC Integration
+
+The **StacSearchAgent** enables searching external [STAC (SpatioTemporal Asset Catalog)](https://stacspec.org/en) APIs for satellite imagery and remote sensing data outside of ArcGIS.
+
+**Default catalogs:**
+- [Element84 Earth Search](https://earth-search.aws.element84.com/v1) — Sentinel-2, Landsat, NAIP, COP-DEM
+- [Microsoft Planetary Computer](https://planetarycomputer.microsoft.com/api/stac/v1) — Sentinel-2, Landsat, ASTER, MODIS, NAIP
+
+**Features:**
+- Search by map extent, date range, cloud cover percentage, and collection
+- Browse available collections from any catalog
+- Load COG (Cloud Optimized GeoTIFF) assets directly as `ImageryTileLayer` — no ArcGIS server required
+- Planetary Computer SAS token signing (free, anonymous, auto-cached)
+- Result pagination with thumbnail previews
+- STAC Catalog Manager UI for adding/removing custom STAC endpoints (persisted to localStorage)
+
+**Known limitations:**
+- COPC point clouds cannot be loaded (ArcGIS JS SDK `PointCloudLayer` requires Scene Service; `@deck.gl/arcgis` does not yet support `@arcgis/core` v5)
+- Earth Search NAIP uses requester-pays S3 — assets cannot be loaded directly in the browser
+- Some STAC collections have thumbnails on S3 buckets without CORS — these are hidden rather than shown broken
 
 ### Built-in Agents
 
@@ -81,9 +103,13 @@ src/
 │   │   ├── contentSearch/          # Multi-node: router → LLM → ToolNode
 │   │   │   ├── nodes/             # Router, LLM prompt, tool execution
 │   │   │   └── tools/             # searchContent, addResults (adapter + core)
-│   │   └── loadLayer/              # Multi-node: router → LLM → ToolNode
+│   │   ├── loadLayer/              # Multi-node: router → LLM → ToolNode
+│   │   │   ├── nodes/             # Router, LLM prompt, tool execution
+│   │   │   └── tools/             # loadLayer, removeLayer, zoomToLayer, geocodePlace
+│   │   ├── mcp/                   # MCP passthrough agent
+│   │   └── stac/                  # STAC search agent
 │   │       ├── nodes/             # Router, LLM prompt, tool execution
-│   │       └── tools/             # loadLayer, removeLayer, zoomToLayer, geocodePlace
+│   │       └── tools/             # searchStac, browseCollections, addStacResults
 │   └── mapTools/                   # Single-node dispatcher
 │       ├── mapToolsNode.ts        # Routes to handlers via keyword matching
 │       └── handlers/              # imagery, pointCloud, elevationOffset, measurement,
@@ -91,6 +117,7 @@ src/
 ├── components/
 │   ├── AgentElement.tsx           # React 18 wrapper for arcgis-assistant-agent
 │   ├── SaveDialog.tsx             # Save map dialog with folder selection
+│   ├── StacCatalogManager.tsx     # STAC catalog add/edit/remove panel
 │   ├── ViewToggle.tsx             # 2D/3D toggle control
 │   └── ErrorBoundary.tsx
 ├── utils/
@@ -101,6 +128,7 @@ src/
 │   ├── layerFactory.ts            # Layer creation from URLs and item IDs
 │   ├── rasterFunctions.ts         # Stretch, template, and identify utilities
 │   ├── agentHelpers.ts            # AGENT_KEYWORDS, shared utilities
+│   ├── stacClient.ts              # STAC API client, endpoint management, SAS signing
 │   ├── typeFilterRegistry.ts      # Portal type → keyword mapping
 │   └── safeFetch.ts               # Fetch with timeout and error handling
 └── App.tsx                        # Main app, view management, contextual prompts
@@ -138,6 +166,14 @@ The assistant shows context-aware suggested prompts based on the current state:
 - `add result 1`
 - `add all results`
 - `load this layer: https://services.arcgis.com/.../FeatureServer`
+
+**STAC search**
+- `search earth search for sentinel-2 imagery with less than 20% cloud cover`
+- `search planetary computer for landsat imagery from last month`
+- `browse collections on earth search`
+- `add STAC result 1`
+- `add all STAC results`
+- `show more STAC results`
 
 **Navigation**
 - `zoom to Denver CO`
@@ -222,3 +258,6 @@ npm run preview   # Preview production build
 - **Built-in data exploration agent** — only supports 2D for querying feature layers. Does not work in 3D SceneView.
 - **React 18 custom element props** — React 18 does not pass object props to web components as properties (fixed in React 19). The `AgentElement` wrapper handles this by setting the `agent` property imperatively.
 - **Save requires ArcGIS Online access** — saving web maps/scenes requires write permissions to your ArcGIS Online content.
+- **STAC COPC point clouds** — cannot be loaded directly. ArcGIS JS SDK `PointCloudLayer` requires a Scene Service endpoint, and `@deck.gl/arcgis` does not yet support `@arcgis/core` v5.
+- **STAC NAIP on Earth Search** — uses a requester-pays S3 bucket (`naip-analytic`). Assets cannot be loaded in the browser. Use Planetary Computer for NAIP instead.
+- **Stop button** — the `arcgis-assistant` stop button does not cancel running agent operations. No abort signal is wired through LangGraph invoke.
