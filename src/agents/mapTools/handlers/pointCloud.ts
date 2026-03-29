@@ -352,25 +352,67 @@ export async function pointCloudHandler(text: string): Promise<{ outputMessage: 
           }
 
           case "modulation": {
-            // Toggle intensity modulation on/off on the current renderer.
-            // PointCloudRenderer.clone() is not implemented in SDK 5.x.
-            // Setting a property on the same object reference doesn't trigger reactivity,
-            // so we null-swap the renderer to force the SDK to re-render.
-            const modRenderer = layer.renderer as any;
-            if (!modRenderer) return { outputMessage: "No renderer on this layer to modulate." };
-            const wasEnabled = !!modRenderer.colorModulation?.field;
-            if (wasEnabled) {
-              modRenderer.colorModulation = null;
-            } else {
-              modRenderer.colorModulation = { field: "INTENSITY", minValue: 0, maxValue: 255 };
+            // Toggle intensity modulation on/off.
+            // Must create a new renderer instance — mutating + null-swap is unreliable in SDK v5.
+            const currentRenderer = layer.renderer as any;
+            if (!currentRenderer) return { outputMessage: "No renderer on this layer to modulate." };
+            const wasEnabled = !!currentRenderer.colorModulation?.field;
+
+            // Detect the intensity field name from the layer's fields (varies by service)
+            const fields = (layer as any).fields ?? [];
+            const intensityField = fields.find((f: any) =>
+              /^intensity$/i.test(f.name)
+            );
+            const fieldName = intensityField?.name ?? "Intensity";
+
+            // Construct a fresh renderer with the same type and properties
+            const rendererType = currentRenderer.type;
+            const rendererProps: any = {};
+
+            // Copy relevant properties based on renderer type
+            if (currentRenderer.field) rendererProps.field = currentRenderer.field;
+            if (currentRenderer.fieldTransformType) rendererProps.fieldTransformType = currentRenderer.fieldTransformType;
+            if (currentRenderer.stops) rendererProps.stops = currentRenderer.stops;
+            if (currentRenderer.pointSizeAlgorithm) rendererProps.pointSizeAlgorithm = currentRenderer.pointSizeAlgorithm;
+            if (currentRenderer.pointsPerInch) rendererProps.pointsPerInch = currentRenderer.pointsPerInch;
+
+            if (!wasEnabled) {
+              rendererProps.colorModulation = {
+                field: fieldName,
+                minValue: 0,
+                maxValue: 255,
+              };
             }
-            // Null-swap to force reactivity
-            layer.renderer = null as any;
-            layer.renderer = modRenderer;
+            // else: omit colorModulation to disable it
+
+            // Create new renderer by type (dynamic imports — same as applySymbology)
+            const PC = await import("@arcgis/core/renderers/PointCloudStretchRenderer");
+            const PCRGB = await import("@arcgis/core/renderers/PointCloudRGBRenderer");
+            const PCUnique = await import("@arcgis/core/renderers/PointCloudUniqueValueRenderer");
+
+            let newRenderer: any;
+            if (rendererType === "point-cloud-stretch") {
+              newRenderer = new PC.default(rendererProps);
+            } else if (rendererType === "point-cloud-rgb") {
+              newRenderer = new PCRGB.default(rendererProps);
+            } else if (rendererType === "point-cloud-unique-value") {
+              newRenderer = new PCUnique.default(rendererProps);
+            } else {
+              // Fallback: try the null-swap approach for unknown renderer types
+              currentRenderer.colorModulation = wasEnabled ? null : { field: fieldName, minValue: 0, maxValue: 255 };
+              layer.renderer = null as any;
+              layer.renderer = currentRenderer;
+              newRenderer = null;
+            }
+
+            if (newRenderer) {
+              layer.renderer = newRenderer;
+            }
+
             return {
               outputMessage: wasEnabled
                 ? `Intensity modulation **disabled** for "${layer.title}".`
-                : `Intensity modulation **enabled** for "${layer.title}". Points are now shaded by intensity on top of the current symbology.`,
+                : `Intensity modulation **enabled** for "${layer.title}" using field "${fieldName}". Points are now shaded by intensity on top of the current symbology.`,
             };
           }
 

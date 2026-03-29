@@ -43,8 +43,11 @@ export const searchStacTool = tool(
         ),
       useBbox: z
         .boolean()
-        .default(true)
-        .describe("Use current map extent as search bounds"),
+        .default(false)
+        .describe(
+          "Use current map extent as search bounds. Set true ONLY when user explicitly references " +
+          "the current area: 'here', 'this area', 'in view', 'my extent', 'current map'. Default false for global searches.",
+        ),
       datetime: z
         .optional(z.string())
         .describe(

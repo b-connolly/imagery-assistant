@@ -4,25 +4,26 @@ import {
   type ScopedSearchResults,
 } from "../../../../../utils/portalSearch";
 import { isElevationService } from "../../../../../utils/layerFactory";
-import { onViewChange } from "../../../../../utils/viewManager";
+
 
 // ── Cached search results for "add result N" follow-ups ──────────────────────
 export let lastSearchResults: ScopedSearchResults[] = [];
+let lastSearchTimestamp = 0;
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Clear stale cached results when the map/view changes
- * (e.g., user loads a different web map).
- * Listener is app-scoped — registered once at module load, lives for the app lifetime.
+ * Check if cached search results are still valid (within TTL).
  */
-onViewChange(() => {
-  lastSearchResults = [];
-});
+export function hasValidSearchResults(): boolean {
+  return lastSearchResults.length > 0 && (Date.now() - lastSearchTimestamp) < SEARCH_CACHE_TTL_MS;
+}
 
 /**
  * Explicitly clear cached search results.
  */
 export function clearSearchResults(): void {
   lastSearchResults = [];
+  lastSearchTimestamp = 0;
 }
 
 /**
@@ -56,8 +57,11 @@ export async function searchContent(params: {
   maxResults: number;
   itemType?: string;
   typeKeyword?: string;
+  sortBy?: "popular" | "recent" | "title";
 }): Promise<string> {
-  const { scope, maxResults, itemType, typeKeyword } = params;
+  const { scope, maxResults, itemType, typeKeyword, sortBy } = params;
+  const sortMap: Record<string, string> = { popular: "num-views", recent: "modified", title: "title" };
+  const sortField = sortMap[sortBy ?? "popular"];
   // Normalize empty/blank keyword to wildcard browse
   const keyword = params.keyword?.trim() || "*";
 
@@ -83,14 +87,17 @@ export async function searchContent(params: {
       maxResults,
       typeKeywordsFilter,
       itemTypes,
+      sortField,
+      sortBy === "recent" ? "desc" : sortBy === "title" ? "asc" : "desc",
     );
   } catch (err: any) {
     console.error("[ContentSearch] Search failed:", err);
     return `Search failed: ${err?.message ?? String(err)}`;
   }
 
-  // Cache results for follow-up "add result N" requests
+  // Cache results for follow-up "add result N" requests (valid for 5 min)
   lastSearchResults = scopedResults;
+  lastSearchTimestamp = Date.now();
 
   const totalResults = scopedResults.reduce(
     (sum, s) => sum + s.results.length,

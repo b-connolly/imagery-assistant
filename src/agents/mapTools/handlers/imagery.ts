@@ -48,6 +48,19 @@ function findColorRamp(text: string): string | null {
   return null;
 }
 
+// ── Template listing cache (survives view switches for 5 min) ────────────────
+let lastTemplateLayerTitle = "";
+let lastTemplateList: { name: string }[] = [];
+let lastTemplateTimestamp = 0;
+const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function getCachedTemplates(): { name: string }[] | null {
+  if (lastTemplateList.length > 0 && (Date.now() - lastTemplateTimestamp) < TEMPLATE_CACHE_TTL_MS) {
+    return lastTemplateList;
+  }
+  return null;
+}
+
 function findImageryLayer(view: any, hint: string | null): ImageryLayer | null {
   const layers = view.map?.layers?.toArray() ?? [];
   if (hint) {
@@ -144,6 +157,11 @@ export async function imageryHandler(text: string): Promise<{ outputMessage: str
           return { outputMessage: `"${layer.title}" has no server processing templates.` };
         }
 
+        // Cache for follow-up "apply N" requests
+        lastTemplateList = templates;
+        lastTemplateLayerTitle = layer.title;
+        lastTemplateTimestamp = Date.now();
+
         const list = templates.map((t, i) => `${i + 1}. ${t.name}`).join("\n");
         // Notify UI to show template-specific prompt buttons
         window.dispatchEvent(new CustomEvent("imagery-assistant-templates-listed", {
@@ -196,8 +214,8 @@ export async function imageryHandler(text: string): Promise<{ outputMessage: str
 
         const rampName = findColorRamp(text);
         if (!rampName) {
-          const rampList = SDK_COLOR_RAMPS.slice(0, 20).join(", ");
-          return { outputMessage: `Couldn't match a color ramp. Some available ramps: ${rampList}...\n\nSay "change color ramp to [name]".` };
+          const rampList = SDK_COLOR_RAMPS.join(", ");
+          return { outputMessage: `Couldn't match a color ramp. Available ramps:\n\n${rampList}\n\nSay "change color ramp to [name]".` };
         }
 
         // Apply stretch with color ramp (keep current stretch type or default to std dev)
@@ -219,7 +237,12 @@ export async function imageryHandler(text: string): Promise<{ outputMessage: str
       if (/\b(apply|use|set|change|switch)\b/i.test(text)) {
         if (!layer) return { outputMessage: "No imagery layer found on the map." };
 
-        const templates = getServerTemplates(layer);
+        // Use live templates, fall back to cached list if layer changed
+        let templates = getServerTemplates(layer);
+        if (templates.length === 0) {
+          const cached = getCachedTemplates();
+          if (cached) templates = cached;
+        }
         if (templates.length === 0) {
           return { outputMessage: `"${layer.title}" has no server processing templates to apply.` };
         }

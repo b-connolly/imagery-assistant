@@ -39,7 +39,8 @@ Cloud cover filtering:
 - "less than 20% cloud cover" → maxCloudCover: 20
 - Works with Sentinel-2, Landsat, and other optical imagery collections.
 
-When the user says "here" or "in this area", set useBbox to true to use the current map extent.
+Set useBbox to true ONLY when the user explicitly references the current map area: "here", "this area", "in view", "my extent", "nearby", "in this location".
+Do NOT set useBbox for general searches like "search for sentinel-2 imagery" — leave it false for global results.
 Default to earth-search if the user does not specify a catalog.`;
 }
 

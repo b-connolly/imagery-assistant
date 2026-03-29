@@ -137,7 +137,10 @@ export default function StacCatalogManager({ open, onClose }: Props) {
   const isEditing = addingNew || editingId !== null;
 
   return (
-    <div ref={panelRef} className="stac-catalog-panel">
+    <div ref={panelRef} className="stac-catalog-panel" onMouseDown={() => {
+      document.querySelectorAll(".panel-focused").forEach((el) => el.classList.remove("panel-focused"));
+      panelRef.current?.classList.add("panel-focused");
+    }}>
       {/* Titlebar */}
       <div className="stac-catalog-titlebar" onMouseDown={onDragStart}>
         <span>

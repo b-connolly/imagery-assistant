@@ -417,8 +417,13 @@ export async function elevationOffsetHandler(text: string): Promise<{ outputMess
     const newOffset = intent.action === "add-offset"
       ? currentOffset + intent.manualOffset
       : intent.manualOffset;
+    // Parse elevation mode from user text (default: absolute-height)
+    let elevMode = "absolute-height";
+    if (/relative[\s-]*to[\s-]*ground|follow[\s-]*terrain/i.test(text)) elevMode = "relative-to-ground";
+    else if (/on[\s-]*the[\s-]*ground|clamp|ground[\s-]*level/i.test(text)) elevMode = "on-the-ground";
+
     layerAny.elevationInfo = {
-      mode: "absolute-height",
+      mode: elevMode,
       offset: newOffset,
     };
 

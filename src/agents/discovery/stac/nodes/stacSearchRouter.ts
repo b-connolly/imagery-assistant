@@ -1,6 +1,6 @@
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { extractLastUserText, AGENT_KEYWORDS } from "../../../../utils/agentHelpers";
-import { lastStacSearchResults, showMoreStacResults, searchStac } from "../tools/searchStac/core";
+import { lastStacSearchResults, hasValidStacResults, showMoreStacResults, searchStac } from "../tools/searchStac/core";
 import { addStacResultsToMap } from "../tools/addStacResults/core";
 import { getStacEndpoints } from "../../../../utils/stacClient";
 import type { StacSearchStateType } from "../state";
@@ -110,7 +110,7 @@ export async function stacSearchRouter(
   // ── Fast-path: "add STAC result N" ──
   const quickAdd = quickExtractStacAddResults(text);
   if (quickAdd !== null) {
-    if (lastStacSearchResults.length === 0) {
+    if (!hasValidStacResults()) {
       return {
         outputMessage:
           "No previous STAC search results. Search a STAC catalog first, then add results by number.",

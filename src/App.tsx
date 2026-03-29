@@ -135,6 +135,7 @@ export default function App() {
         // ── Add layer list + basemap gallery via view.ui.add() → top-right ──
         const layerExpand = document.createElement("arcgis-expand");
         layerExpand.setAttribute("expand-icon", "layers");
+        layerExpand.setAttribute("expand-tooltip", "Layers");
         layerExpand.setAttribute("scale", "l");
         const layerList = document.createElement("arcgis-layer-list") as any;
         layerList.view = view;
@@ -262,6 +263,7 @@ export default function App() {
 
         const basemapExpand = document.createElement("arcgis-expand");
         basemapExpand.setAttribute("expand-icon", "basemap");
+        basemapExpand.setAttribute("expand-tooltip", "Basemaps");
         basemapExpand.setAttribute("scale", "l");
         const basemapGallery = document.createElement("arcgis-basemap-gallery") as any;
         basemapGallery.view = view;
@@ -287,11 +289,11 @@ export default function App() {
             if (bookmarkCount > 0) {
               const bookmarksExpand = document.createElement("arcgis-expand");
               bookmarksExpand.setAttribute("expand-icon", "bookmark");
+              bookmarksExpand.setAttribute("expand-tooltip", "Bookmarks");
               bookmarksExpand.setAttribute("scale", "l");
-              bookmarksExpand.setAttribute("position", "top-right");
               const bookmarksEl = document.createElement("arcgis-bookmarks") as any;
               bookmarksExpand.appendChild(bookmarksEl);
-              mapSceneEl.appendChild(bookmarksExpand);
+              view.ui.add(bookmarksExpand, "top-right");
               console.log("[App] Added Bookmarks —", bookmarkCount, "bookmarks");
             }
 
@@ -329,12 +331,12 @@ export default function App() {
 
               // Wrap in expand using arcgis-expand
               const expandEl = document.createElement("arcgis-expand");
-              expandEl.setAttribute("expand-icon", "bookmark");
+              expandEl.setAttribute("expand-icon", "presentation");
+              expandEl.setAttribute("expand-tooltip", "Slides");
               expandEl.setAttribute("scale", "l");
-              expandEl.setAttribute("position", "top-right");
               expandEl.className = "slides-expand-container";
               expandEl.appendChild(slidesPanel);
-              mapSceneEl.appendChild(expandEl);
+              view.ui.add(expandEl, "top-right");
               console.log("[App] Added Slides panel —", slideCount, "slides");
             }
           } catch (err) {

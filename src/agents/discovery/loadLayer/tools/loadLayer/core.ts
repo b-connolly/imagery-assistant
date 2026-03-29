@@ -309,8 +309,10 @@ export async function loadLayer(
       ];
       for (const [keywords, stretchType] of stretchMap) {
         if (keywords.some((k) => textLower.includes(k))) {
-          applyStretch(imgLayer, stretchType, { stdDevs: 2 });
-          results.push(`Applied ${stretchType} stretch.`);
+          const stdMatch = textLower.match(/(\d+(?:\.\d+)?)\s*(?:std\s*dev|standard\s*deviation)/);
+          const stdDevs = stdMatch ? parseFloat(stdMatch[1]) : 2;
+          applyStretch(imgLayer, stretchType, { stdDevs });
+          results.push(`Applied ${stretchType} stretch${stdDevs !== 2 ? ` (${stdDevs} std devs)` : ""}.`);
           break;
         }
       }

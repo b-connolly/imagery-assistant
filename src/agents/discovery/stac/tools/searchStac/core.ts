@@ -8,24 +8,23 @@ import {
   type StacItem,
   type StacEndpoint,
 } from "../../../../../utils/stacClient";
-import { onViewChange } from "../../../../../utils/viewManager";
-
 // ── Cached results for "add STAC result N" follow-ups ───────────────────────
 
 export let lastStacSearchResults: StacItem[] = [];
 export let lastStacEndpoint: StacEndpoint | null = null;
 export let lastStacDisplayedCount = 0;
+let lastStacSearchTimestamp = 0;
+const STAC_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-onViewChange(() => {
-  lastStacSearchResults = [];
-  lastStacEndpoint = null;
-  lastStacDisplayedCount = 0;
-});
+export function hasValidStacResults(): boolean {
+  return lastStacSearchResults.length > 0 && (Date.now() - lastStacSearchTimestamp) < STAC_CACHE_TTL_MS;
+}
 
 export function clearStacSearchResults(): void {
   lastStacSearchResults = [];
   lastStacEndpoint = null;
   lastStacDisplayedCount = 0;
+  lastStacSearchTimestamp = 0;
 }
 
 const PAGE_SIZE = 10;
@@ -181,6 +180,7 @@ export async function searchStac(params: {
   const items = result.features ?? [];
   lastStacSearchResults = items;
   lastStacEndpoint = ep;
+  lastStacSearchTimestamp = Date.now();
 
   if (items.length === 0) {
     const parts = [`No results found on ${ep.name}`];
