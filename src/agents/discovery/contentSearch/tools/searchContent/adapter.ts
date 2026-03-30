@@ -21,7 +21,7 @@ export const searchContentTool = tool(
     name: "search_content",
     description:
       "Search for layers, datasets, and content across ArcGIS sources. " +
-      "Returns 5 results by default. Use maxResults to return a specific number " +
+      "Returns 10 results by default. Use maxResults to return a specific number " +
       "(e.g. 'top 10' → maxResults: 10, 'find all' → maxResults: 100). " +
       "Available scopes: " +
       "'my-content' (user's own items), " +
