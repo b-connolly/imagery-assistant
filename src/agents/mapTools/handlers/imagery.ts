@@ -19,7 +19,7 @@ import {
 let clickHandlerRemove: (() => void) | null = null;
 let identifyLayerTitle: string | null = null;
 
-function clearClickHandler(): void {
+export function clearClickHandler(): void {
   if (clickHandlerRemove) {
     clickHandlerRemove();
     clickHandlerRemove = null;

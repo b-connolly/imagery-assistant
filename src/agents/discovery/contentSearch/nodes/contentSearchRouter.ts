@@ -112,6 +112,7 @@ export async function contentSearchRouter(
       { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
       { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
       { pattern: AGENT_KEYWORDS.stac, label: "StacSearchAgent" },
+      { pattern: AGENT_KEYWORDS.coordinate, label: "CoordinateHandler" },
     ];
     for (const { pattern, label } of bailouts) {
       if (pattern.test(text)) {

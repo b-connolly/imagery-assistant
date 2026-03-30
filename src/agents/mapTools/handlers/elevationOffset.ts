@@ -4,6 +4,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getCurrentView, getCurrentViewType, requestViewSwitch, getOperationalLayers, onViewChange } from "../../../utils/viewManager";
 import { REQUIRES_3D, findLayerByTitle, elapsed } from "../../../utils/agentHelpers";
+import { clearClickHandler as clearImageryClickHandler } from "./imagery";
 import { withTimeout } from "../../../utils/safeFetch";
 
 // ── Extraction tool ──────────────────────────────────────────────────────────
@@ -255,11 +256,12 @@ export async function elevationOffsetHandler(text: string): Promise<{ outputMess
       return { outputMessage: "Click-to-fix requires a 3D scene view." };
     }
 
-    // Clean up any previous click handler
+    // Clean up any previous click handlers (ours + imagery identify)
     if (elevClickRemove) {
       elevClickRemove();
       elevClickRemove = null;
     }
+    clearImageryClickHandler();
 
     const targetLayer = layer;
     const targetLayerAny = layerAny;
@@ -302,7 +304,7 @@ export async function elevationOffsetHandler(text: string): Promise<{ outputMess
           console.log("[ElevOffset] Click-to-fix: layerZ:", layerZ, "terrainZ:", terrainZ,
             "delta:", delta, "newOffset:", newOffset);
 
-          view.popup?.open({
+          (view as any).openPopup?.({
             title: `Elevation Fixed: ${targetLayer.title}`,
             content: `Layer surface: ${layerZ.toFixed(1)}m | Terrain: ${terrainZ.toFixed(1)}m | Adjusted by ${delta.toFixed(1)}m → offset: ${newOffset.toFixed(1)}m`,
             location: event.mapPoint,
@@ -317,7 +319,7 @@ export async function elevationOffsetHandler(text: string): Promise<{ outputMess
 
           console.log("[ElevOffset] Click-to-fix: layer not hit (underground?), set relative-to-ground, terrainZ:", terrainZ);
 
-          view.popup?.open({
+          (view as any).openPopup?.({
             title: `Elevation Fixed: ${targetLayer.title}`,
             content: `Layer was not visible at click point (may be underground). Set to ground-relative mode. Terrain: ${terrainZ.toFixed(1)}m.`,
             location: event.mapPoint,
