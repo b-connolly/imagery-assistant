@@ -18,7 +18,9 @@ export interface PortalSearchResult {
 export async function searchPortalItems(
   keyword: string,
   itemTypes: string[] = ["Image Service"],
-  maxResults = 10
+  maxResults = 10,
+  sortField: string = "num-views",
+  sortOrder: "asc" | "desc" = "desc"
 ): Promise<PortalSearchResult[]> {
   const portal = await getPortal();
 
@@ -28,8 +30,8 @@ export async function searchPortalItems(
   const query = new PortalQueryParams({
     query: queryString,
     num: maxResults,
-    sortField: "num-views",
-    sortOrder: "desc",
+    sortField,
+    sortOrder,
   });
 
   const response = await portal.queryItems(query);
@@ -127,7 +129,9 @@ export async function searchContentByScope(
   scope: SearchScope = "all",
   maxPerScope = 5,
   typeKeywordsFilter?: string,
-  itemTypes?: string[]
+  itemTypes?: string[],
+  sortField: string = "num-views",
+  sortOrder: "asc" | "desc" = "desc"
 ): Promise<ScopedSearchResults[]> {
   const portal = await getPortal();
 
@@ -179,8 +183,8 @@ export async function searchContentByScope(
         const qp = new PortalQueryParams({
           query,
           num: maxPerScope,
-          sortField: "num-views",
-          sortOrder: "desc",
+          sortField,
+          sortOrder,
         });
         let response = await portal.queryItems(qp);
         console.log(`[portalSearch] ${label}: ${response.results.length} results`);

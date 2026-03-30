@@ -33,11 +33,17 @@ export async function geocodePlace(params: {
 
     const candidate = (result as any)?.[0];
     if (candidate?.location) {
+      const zoomByAddrType: Record<string, number> = {
+        Country: 5, Territory: 6, Admin1: 7, Admin2: 9,
+        Locality: 12, Sublocality: 14, PostalCode: 13,
+        StreetName: 15, StreetAddress: 17, PointAddress: 18,
+      };
+      const addrType = candidate.attributes?.Addr_type ?? "";
+      const zoom = zoomByAddrType[addrType] ?? 14;
       await activeView.goTo(
         {
           target: candidate.location,
-          zoom:
-            candidate.attributes?.Addr_type === "Locality" ? 12 : 15,
+          zoom,
         },
         { duration: 2000 }
       );

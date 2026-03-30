@@ -1,6 +1,6 @@
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { extractLastUserText, AGENT_KEYWORDS } from "../../../../utils/agentHelpers";
-import { lastSearchResults } from "../tools/searchContent/core";
+import { lastSearchResults, hasValidSearchResults } from "../tools/searchContent/core";
 import { addResultsToMap } from "../tools/addResults/core";
 import type { ContentSearchStateType } from "../state";
 
@@ -111,6 +111,8 @@ export async function contentSearchRouter(
       { pattern: AGENT_KEYWORDS.orientedImagery, label: "OrientedImageryAgent" },
       { pattern: AGENT_KEYWORDS.catalogLayer, label: "CatalogLayerAgent" },
       { pattern: AGENT_KEYWORDS.layerInfo, label: "LayerInfoAgent" },
+      { pattern: AGENT_KEYWORDS.stac, label: "StacSearchAgent" },
+      { pattern: AGENT_KEYWORDS.coordinate, label: "CoordinateHandler" },
     ];
     for (const { pattern, label } of bailouts) {
       if (pattern.test(text)) {
@@ -124,7 +126,7 @@ export async function contentSearchRouter(
   }
 
   // Handle add-result request directly (no LLM call needed)
-  if (lastSearchResults.length === 0) {
+  if (!hasValidSearchResults()) {
     return {
       outputMessage:
         "No previous search results. Search for content first, then add results by number.",

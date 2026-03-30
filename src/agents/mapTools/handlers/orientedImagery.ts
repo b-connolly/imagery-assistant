@@ -85,6 +85,12 @@ function createViewerPanel(layer: any, view: any, parent: HTMLElement): HTMLElem
   // Make draggable via title bar
   makeDraggable(container, titleBar);
 
+  // Focus-to-front: bring this panel above others on click
+  container.addEventListener("mousedown", () => {
+    document.querySelectorAll(".panel-focused").forEach((el) => el.classList.remove("panel-focused"));
+    container.classList.add("panel-focused");
+  });
+
   activePanel = container;
   activeViewer = viewer;
 

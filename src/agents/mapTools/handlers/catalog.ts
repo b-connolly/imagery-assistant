@@ -100,6 +100,12 @@ async function createFilterPanel(
   container.appendChild(titleBar);
   makeDraggable(container, titleBar);
 
+  // Focus-to-front: bring this panel above others on click
+  container.addEventListener("mousedown", () => {
+    document.querySelectorAll(".panel-focused").forEach((el) => el.classList.remove("panel-focused"));
+    container.classList.add("panel-focused");
+  });
+
   // Content area
   const content = document.createElement("div");
   content.className = "catalog-filter-content";

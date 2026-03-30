@@ -11,6 +11,7 @@ import { elevationOffsetHandler } from "./handlers/elevationOffset";
 import { imageryHandler } from "./handlers/imagery";
 import { pointCloudHandler } from "./handlers/pointCloud";
 import { saveHandler } from "./handlers/save";
+import { coordinateHandler } from "./handlers/coordinate";
 
 export async function mapToolsNode(s: MapToolsStateType, config?: RunnableConfig) {
   await sendTraceMessage({ text: "MapTools: processing request" }, config);
@@ -41,6 +42,7 @@ export async function mapToolsNode(s: MapToolsStateType, config?: RunnableConfig
   if (AGENT_KEYWORDS.swipe.test(text)) return swipeHandler(text);
   if (AGENT_KEYWORDS.orientedImagery.test(text)) return orientedImageryHandler(text);
   if (AGENT_KEYWORDS.catalogLayer.test(text)) return catalogHandler(text);
+  if (AGENT_KEYWORDS.coordinate.test(text)) return coordinateHandler(text);
   if (AGENT_KEYWORDS.layerInfo.test(text)) return layerInfoHandler(text);
 
   // Default: try layer info as catch-all

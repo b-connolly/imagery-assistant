@@ -61,6 +61,8 @@ export const AGENT_KEYWORDS = {
   capabilities: /\b(what\s*can\s*you\s*do|capabilities|help me|what\s*tools|what\s*agents)\b/i,
   search: /\b(search|find|browse|discover|look\s*up)\b/i,
   scopedContent: /\b(my\s+content|my\s+org|living\s*atlas|arcgis\s*online)\b/i,
+  stac: /\b(stac|sentinel[\s-]?\d|landsat[\s-]?\d|naip|modis|aster|earth\s*search|planetary\s*computer|cog\b|cloud\s*optimized|remote\s*sensing|satellite\s*imager|copernicus|stac\s*catalog|stac\s*api|external\s*catalog)\b/i,
+  coordinate: /\b(get\s*coord|pick\s*(a\s+)?location|click\s*(for\s*)?(coord|location|point)|where\s*is\s*this|lat\s*(and|&)?\s*lon|what\s*coord|grab\s*coord|capture\s*coord)/i,
 } as const;
 
 // ── Message extraction ──────────────────────────────────────────────────────
