@@ -256,6 +256,6 @@ npm run preview   # Preview production build
 - **Built-in data exploration agent** — only supports 2D for querying feature layers. Does not work in 3D SceneView.
 - **React 18 custom element props** — React 18 does not pass object props to web components as properties (fixed in React 19). The `AgentElement` wrapper handles this by setting the `agent` property imperatively.
 - **Save requires ArcGIS Online access** — saving web maps/scenes requires write permissions to your ArcGIS Online content.
+- **STAC items cannot be saved to maps or scenes** — saving web maps/scenes is limited to only those supported currently in ArcGIS Online.
 - **STAC COPC point clouds** — cannot be loaded directly. ArcGIS JS SDK `PointCloudLayer` requires a Scene Service endpoint, and `@deck.gl/arcgis` does not yet support `@arcgis/core` v5.
-- **STAC NAIP on Earth Search** — uses a requester-pays S3 bucket (`naip-analytic`). Assets cannot be loaded in the browser. Use Planetary Computer for NAIP instead.
 - **Stop button** — the `arcgis-assistant` stop button does not cancel running agent operations. No abort signal is wired through LangGraph invoke.
