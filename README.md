@@ -58,7 +58,7 @@ The app uses 3 consolidated custom agents, each following ArcGIS SDK best practi
 
 ### STAC Integration
 
-The **StacSearchAgent** enables searching external [STAC (SpatioTemporal Asset Catalog)](https://stacspec.org/en) APIs for satellite imagery and remote sensing data outside of ArcGIS.
+The **StacSearchAgent** enables searching external [STAC (SpatioTemporal Asset Catalog)](https://stacspec.org/en) APIs for satellite imagery and remote sensing data outside of ArcGIS. 
 
 **Default catalogs:**
 - [Element84 Earth Search](https://earth-search.aws.element84.com/v1) — Sentinel-2, Landsat, NAIP, COP-DEM
@@ -73,9 +73,8 @@ The **StacSearchAgent** enables searching external [STAC (SpatioTemporal Asset C
 - STAC Catalog Manager UI for adding/removing custom STAC endpoints (persisted to localStorage)
 
 **Known limitations:**
-- COPC point clouds cannot be loaded (ArcGIS JS SDK `PointCloudLayer` requires Scene Service; `@deck.gl/arcgis` does not yet support `@arcgis/core` v5)
-- Earth Search NAIP uses requester-pays S3 — assets cannot be loaded directly in the browser
-- Some STAC collections have thumbnails on S3 buckets without CORS — these are hidden rather than shown broken
+- No STAC items can be accessed if requester-pays, open data only. 
+- COPC point clouds cannot be loaded
 
 ### Built-in Agents
 
