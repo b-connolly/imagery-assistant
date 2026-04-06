@@ -1,5 +1,6 @@
 import { getCurrentView, getCurrentViewType, onViewChange, requestViewSwitch } from "../../../utils/viewManager";
 import { elapsed } from "../../../utils/agentHelpers";
+import { withTimeout } from "../../../utils/safeFetch";
 import Collection from "@arcgis/core/core/Collection";
 import ElevationProfileLineGround from "@arcgis/core/analysis/ElevationProfile/ElevationProfileLineGround";
 import ElevationProfileLineScene from "@arcgis/core/analysis/ElevationProfile/ElevationProfileLineScene";
@@ -20,8 +21,8 @@ function clearActiveWidget(): void {
         view.ui.remove(activeElement);
       }
       activeElement.remove();
-    } catch {
-      // Element may already be removed
+    } catch (err) {
+      console.warn("[Measurement] Widget cleanup failed:", err);
     }
     activeElement = null;
     activeWidgetType = null;
@@ -293,8 +294,9 @@ export async function measurementHandler(text: string): Promise<{ outputMessage:
       // Volume measurement requires 3D — switch automatically if needed
       if (!is3D) {
         try {
-          await requestViewSwitch("3d");
-        } catch {
+          await withTimeout(requestViewSwitch("3d"), 30000, "Switch to 3D for volume measurement");
+        } catch (err) {
+          console.warn("[Measurement] 3D switch failed:", err);
           return {
             outputMessage:
               "Volume measurement requires a 3D scene view. Please switch to 3D using the toggle and try again.",

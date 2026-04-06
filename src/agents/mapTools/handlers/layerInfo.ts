@@ -1,6 +1,6 @@
 import { getCurrentView } from "../../../utils/viewManager";
 import { findLayerByTitle } from "../../../utils/agentHelpers";
-import { withTimeout } from "../../../utils/safeFetch";
+import { safeFetchJson, withTimeout } from "../../../utils/safeFetch";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -109,7 +109,7 @@ async function summarizeLayer(layer: any): Promise<LayerSummary> {
       for (const sub of subs) {
         tables.push(`Sublayer: ${sub.title || sub.id}`);
       }
-    } catch { /* ignore */ }
+    } catch (err) { console.warn("[LayerInfo] Sublayers read failed:", err); }
   }
 
   // Capabilities
@@ -263,18 +263,13 @@ async function fetchRasterStatistics(serviceUrl: string): Promise<BandStats[]> {
     // Public service — no token needed
   }
 
-  const params = new URLSearchParams({ f: "json" });
-  if (token) params.set("token", token);
+  const form = new FormData();
+  form.append("f", "json");
+  if (token) form.append("token", token);
 
-  const response = await fetch(`${statsUrl}?${params}`);
-  if (!response.ok) {
-    throw new Error(`Statistics request failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  if (data.error) {
-    throw new Error(data.error.message || "Statistics computation failed");
-  }
+  const data = await safeFetchJson<{ statistics?: any[]; error?: { message: string } }>(
+    statsUrl, { method: "POST", body: form }, 30000
+  );
 
   const stats: BandStats[] = [];
   const bandStats = data.statistics ?? [];
@@ -434,7 +429,7 @@ export async function layerInfoHandler(text: string): Promise<{ outputMessage: s
     }
 
     // Ensure layer is loaded so fields are available
-    try { await withTimeout(targetLayer.load(), 30000, `Load "${targetLayer.title}"`); } catch { /* continue */ }
+    try { await withTimeout(targetLayer.load(), 30000, `Load "${targetLayer.title}"`); } catch (err) { console.warn("[LayerInfo] Target layer load failed:", err); }
 
     // If no fields specified, use all available fields
     if (fieldNames.length === 0 && targetLayer.fields) {

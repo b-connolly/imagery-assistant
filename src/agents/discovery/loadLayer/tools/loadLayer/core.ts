@@ -105,9 +105,9 @@ export async function tryLoadWebMapOrScene(text: string): Promise<string | null>
     console.log(`[LoadLayer] Loading ${typeLabel}:`, best.title, best.itemId);
 
     if (isSceneRequest) {
-      await requestWebSceneSwitch(best.itemId);
+      await withTimeout(requestWebSceneSwitch(best.itemId), 30000, `Load web scene "${best.title}"`);
     } else {
-      await requestWebMapSwitch(best.itemId);
+      await withTimeout(requestWebMapSwitch(best.itemId), 30000, `Load web map "${best.title}"`);
     }
 
     const elapsedTime = elapsed(t0);
@@ -152,13 +152,13 @@ export async function loadLayer(
       const itemInfo = await getPortalItemUrl(params.itemId);
       if (itemInfo && itemInfo.type === "Web Map") {
         console.log("[LoadLayer] Item is a Web Map, switching...");
-        await requestWebMapSwitch(params.itemId);
+        await withTimeout(requestWebMapSwitch(params.itemId), 30000, `Load web map "${itemInfo.title}"`);
         const elapsedTime = elapsed(t0);
         return `Loaded web map "${itemInfo.title}" in ${elapsedTime}s.`;
       }
       if (itemInfo && itemInfo.type === "Web Scene") {
         console.log("[LoadLayer] Item is a Web Scene, switching...");
-        await requestWebSceneSwitch(params.itemId);
+        await withTimeout(requestWebSceneSwitch(params.itemId), 30000, `Load web scene "${itemInfo.title}"`);
         const elapsedTime = elapsed(t0);
         return `Loaded web scene "${itemInfo.title}" in ${elapsedTime}s.`;
       }
@@ -168,7 +168,7 @@ export async function loadLayer(
       displayName = layer.title || params.itemId;
     } else if (params.keyword) {
       console.log("[LoadLayer] Searching portal for:", params.keyword);
-      const results = await searchAllItems(params.keyword, 5);
+      const results = await withTimeout(searchAllItems(params.keyword, 5), 15000, `Search portal for "${params.keyword}"`);
       if (results.length === 0) {
         return `No layers found matching "${params.keyword}". Try a different search term or provide a direct URL.`;
       }
@@ -217,8 +217,9 @@ export async function loadLayer(
       "requires 3D. Switching..."
     );
     try {
-      await requestViewSwitch("3d");
-    } catch {
+      await withTimeout(requestViewSwitch("3d"), 30000, "Switch to 3D for layer");
+    } catch (err) {
+      console.warn("[LoadLayer] 3D switch failed:", err);
       return (
         `Layer "${displayName}" requires a 3D scene view. ` +
         "Please switch to 3D using the toggle, then ask me again."
@@ -275,8 +276,8 @@ export async function loadLayer(
         if (layer.fullExtent) {
           try {
             await activeView.goTo(layer.fullExtent, { duration: 1500 });
-          } catch {
-            /* ok */
+          } catch (err) {
+            console.warn("[LoadLayer] goTo after offset failed:", err);
           }
         }
       }

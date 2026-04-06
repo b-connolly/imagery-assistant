@@ -7,9 +7,10 @@ import { withTimeout } from "./safeFetch";
 const portalUrl =
   import.meta.env.VITE_ARCGIS_PORTAL_URL || "https://www.arcgis.com";
 
-// Read-only default web map — provides embeddings for the orchestrator.
+// Default web map — provides embeddings for the orchestrator.
 // Must have an embeddings-v01.json resource already configured.
-export const DEFAULT_WEBMAP_ID = "6b94fb4c65e347b68b6f1e138af6b195";
+// Set via VITE_WEBMAP_ITEM_ID in .env.local.
+export const DEFAULT_WEBMAP_ID = import.meta.env.VITE_WEBMAP_ITEM_ID || "";
 
 // ── Centralized Portal instance ──────────────────────────────────────────────
 

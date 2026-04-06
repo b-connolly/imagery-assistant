@@ -761,7 +761,7 @@ export default function App() {
               key={webMapId || "default-map"}
               ref={mapSceneRefCallback}
               id="main-map"
-              item-id={webMapId ?? DEFAULT_WEBMAP_ID}
+              item-id={webMapId || DEFAULT_WEBMAP_ID || undefined}
               center={`${DEFAULT_CENTER[0]},${DEFAULT_CENTER[1]}`}
               zoom={DEFAULT_ZOOM}
             >

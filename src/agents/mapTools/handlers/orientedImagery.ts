@@ -10,8 +10,8 @@ function clearViewer(): boolean {
   if (!activePanel) return false;
   try {
     activePanel.remove();
-  } catch {
-    // Element may already be removed
+  } catch (err) {
+    console.warn("[OrientedImagery] Panel cleanup failed:", err);
   }
   activePanel = null;
   activeViewer = null;

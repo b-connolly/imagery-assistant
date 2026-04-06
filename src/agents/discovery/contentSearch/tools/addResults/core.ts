@@ -63,9 +63,10 @@ async function addMultipleResultsToMap(
   if (needs3D && getCurrentViewType() !== "3d") {
     console.log("[ContentSearch] Some layers require 3D, switching...");
     try {
-      await requestViewSwitch("3d");
-    } catch {
+      await withTimeout(requestViewSwitch("3d"), 30000, "Switch to 3D for content results");
+    } catch (err) {
       // Continue in 2D — 3D layers will fail but 2D layers will still load
+      console.warn("[ContentSearch] 3D switch failed:", err);
       messages.push(
         "Could not switch to 3D view. 3D-only layers may fail to load.",
       );
@@ -86,12 +87,12 @@ async function addMultipleResultsToMap(
       // Web Scenes and Web Maps are entire maps, not layers — load via view switch
       const typeLower = target.type.toLowerCase();
       if (typeLower === "web scene") {
-        await requestWebSceneSwitch(target.itemId);
+        await withTimeout(requestWebSceneSwitch(target.itemId), 30000, `Open Web Scene "${target.title}"`);
         const elapsedTime = elapsed(lt0);
         return `Opened Web Scene "${target.title}" (${elapsedTime}s)`;
       }
       if (typeLower === "web map") {
-        await requestWebMapSwitch(target.itemId);
+        await withTimeout(requestWebMapSwitch(target.itemId), 30000, `Open Web Map "${target.title}"`);
         const elapsedTime = elapsed(lt0);
         return `Opened Web Map "${target.title}" (${elapsedTime}s)`;
       }
@@ -154,8 +155,8 @@ async function addMultipleResultsToMap(
               "queryExtent",
             );
             zoomTarget = result?.extent;
-          } catch {
-            /* fall through — timeout or error */
+          } catch (err) {
+            console.warn("[ContentSearch] queryExtent failed:", err);
           }
         }
       }
@@ -165,8 +166,8 @@ async function addMultipleResultsToMap(
           if (!lv?.fullExtent)
             await new Promise((r) => setTimeout(r, 500));
           zoomTarget = lv?.fullExtent || layer.fullExtent;
-        } catch {
-          /* continue */
+        } catch (err) {
+          console.warn("[ContentSearch] whenLayerView fallback failed:", err);
         }
       }
 
@@ -179,8 +180,8 @@ async function addMultipleResultsToMap(
               ? { target: zoomTarget, tilt: 65 }
               : zoomTarget;
           await view.goTo(goToParams as any, { duration: 2000 });
-        } catch {
-          /* non-critical */
+        } catch (err) {
+          console.warn("[ContentSearch] goTo failed:", err);
         }
       } else if (isBatch && zoomTarget && !firstExtent) {
         firstExtent = { extent: zoomTarget, type: target.type };
@@ -213,8 +214,8 @@ async function addMultipleResultsToMap(
           ? { target: firstExtent.extent, tilt: 65 }
           : firstExtent.extent;
       await view.goTo(goToParams as any, { duration: 2000 });
-    } catch {
-      /* non-critical */
+    } catch (err) {
+      console.warn("[ContentSearch] Batch goTo failed:", err);
     }
   }
 

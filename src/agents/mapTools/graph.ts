@@ -84,7 +84,8 @@ export const MapToolsAgent: AgentRegistration = {
     "fix elevation, offset, raise, lower, floating, underground, misaligned, click to fix, calculate offset, " +
     "point cloud, lidar, classification, class code, point size, point density, color by, return number, " +
     "open catalog filter, close catalog filter, clear catalog filter, " +
-    "save web map, save web scene, save map, save scene.",
+    "save web map, save web scene, save map, save scene, " +
+    "what can you do, help me, what tools, what agents.",
   createGraph: createMapToolsGraph,
   workspace: MapToolsState,
 };

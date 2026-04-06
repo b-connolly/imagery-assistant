@@ -18,14 +18,49 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
-import express, { type Request, type Response } from "express";
+import { resolve, basename } from "node:path";
+import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+
+// ── Security ─────────────────────────────────────────────────────────────────
+
+const MCP_HUB_AUTH_TOKEN = process.env.MCP_HUB_AUTH_TOKEN?.trim() || null;
+
+const DEFAULT_ALLOWED_COMMANDS = ["npx", "node", "python", "python3", "uvx", "uv", "docker"];
+const ALLOWED_COMMANDS: string[] = process.env.MCP_HUB_ALLOWED_COMMANDS
+  ? process.env.MCP_HUB_ALLOWED_COMMANDS.split(",").map((c) => c.trim()).filter(Boolean)
+  : DEFAULT_ALLOWED_COMMANDS;
+
+/** Bearer-token auth middleware. Applied to /api/* routes. */
+function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (!MCP_HUB_AUTH_TOKEN) {
+    next();
+    return;
+  }
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith("Bearer ") || header.slice(7).trim() !== MCP_HUB_AUTH_TOKEN) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  next();
+}
+
+/**
+ * Validate that a stdio command's basename is in the allowlist.
+ * Returns an error message string if disallowed, or null if OK.
+ */
+function validateCommand(command: string): string | null {
+  const base = basename(command).replace(/\.exe$/i, "");
+  if (!ALLOWED_COMMANDS.includes(base)) {
+    return `Command "${command}" is not allowed. Allowed commands: ${ALLOWED_COMMANDS.join(", ")}`;
+  }
+  return null;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -241,6 +276,8 @@ async function startServer(state: ServerState): Promise<void> {
     if (state.config.transport === "stdio") {
       // ── Stdio: spawn a local process ────────────────────────────────────
       if (!state.config.command) throw new Error("command is required for stdio transport");
+      const cmdError = validateCommand(state.config.command);
+      if (cmdError) throw new Error(cmdError);
       const stdio = new StdioClientTransport({
         command: state.config.command,
         args: state.config.args ?? [],
@@ -408,6 +445,11 @@ function buildApp() {
     });
   });
 
+  // ── Auth middleware for API routes ─────────────────────────────────────────
+  // Applied to all management and JSON-RPC endpoints, but not health or CORS preflight.
+  app.use("/servers", authMiddleware);
+  app.use("/mcp", authMiddleware);
+
   // ── REST management API ───────────────────────────────────────────────────
 
   // List all servers
@@ -429,6 +471,13 @@ function buildApp() {
     if (config.transport === "stdio" && (!config.command || typeof config.command !== "string")) {
       res.status(400).json({ error: "command is required for stdio transport" });
       return;
+    }
+    if (config.transport === "stdio" && config.command) {
+      const cmdError = validateCommand(config.command);
+      if (cmdError) {
+        res.status(400).json({ error: cmdError });
+        return;
+      }
     }
 
     const state: ServerState = {
@@ -479,7 +528,15 @@ function buildApp() {
       state.config.url = typeof incoming.url === "string" ? incoming.url.trim() : undefined;
     }
     if (incoming.command !== undefined) {
-      state.config.command = typeof incoming.command === "string" ? incoming.command.trim() : undefined;
+      const newCmd = typeof incoming.command === "string" ? incoming.command.trim() : undefined;
+      if (newCmd && state.config.transport === "stdio") {
+        const cmdError = validateCommand(newCmd);
+        if (cmdError) {
+          res.status(400).json({ error: cmdError });
+          return;
+        }
+      }
+      state.config.command = newCmd;
     }
     if (incoming.args !== undefined) {
       state.config.args = Array.isArray(incoming.args)
@@ -547,7 +604,7 @@ function buildApp() {
 
   // ── JSON-RPC 2.0 ─────────────────────────────────────────────────────────
 
-  app.post("/", handleJsonRpc);
+  app.post("/", authMiddleware, handleJsonRpc);
   app.post("/mcp", handleJsonRpc);
 
   return app;
@@ -626,6 +683,16 @@ async function main() {
   const port = Number(process.env.MCP_HUB_PORT) || hubConfig.port || 8808;
 
   console.log("MCP Local Hub — starting …");
+
+  // Security: auth token
+  if (MCP_HUB_AUTH_TOKEN) {
+    console.log("  🔒 Auth enabled — API routes require Bearer token");
+  } else {
+    console.warn("  ⚠️  WARNING: MCP_HUB_AUTH_TOKEN is not set — API routes are unauthenticated");
+  }
+
+  // Security: allowed stdio commands
+  console.log(`  Allowed stdio commands: ${ALLOWED_COMMANDS.join(", ")}`);
 
   for (const serverConfig of hubConfig.servers) {
     const state: ServerState = {

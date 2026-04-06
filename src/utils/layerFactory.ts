@@ -13,6 +13,7 @@ import FeatureLayer from "@arcgis/core/layers/FeatureLayer";
 import OrientedImageryLayer from "@arcgis/core/layers/OrientedImageryLayer";
 import CatalogLayer from "@arcgis/core/layers/CatalogLayer";
 import GroupLayer from "@arcgis/core/layers/GroupLayer";
+import { safeFetchJson } from "./safeFetch";
 
 // ── Design principle ─────────────────────────────────────────────────────────
 //
@@ -96,12 +97,12 @@ export async function createLayerFromItemId(
   // Fetch item metadata to check typeKeywords for sub-types the SDK mis-detects.
   try {
     const portalUrl = (await import("./arcgisAuth")).portalUrl;
-    const resp = await fetch(`${portalUrl}/sharing/rest/content/items/${itemId}?f=json`);
-    if (resp.ok) {
-      const itemInfo = await resp.json();
-      const keywords: string[] = itemInfo.typeKeywords ?? [];
-      const keywordsLower = keywords.map((k: string) => k.toLowerCase());
-      const itemType = (itemInfo.type ?? "").toLowerCase();
+    const itemInfo = await safeFetchJson<{ type?: string; typeKeywords?: string[]; url?: string; title?: string }>(
+      `${portalUrl}/sharing/rest/content/items/${itemId}?f=json`
+    );
+    const keywords: string[] = itemInfo.typeKeywords ?? [];
+    const keywordsLower = keywords.map((k: string) => k.toLowerCase());
+    const itemType = (itemInfo.type ?? "").toLowerCase();
 
       // Gaussian Splat — "3DTiles Service" + typeKeyword "GaussianSplat"
       if (keywordsLower.includes("gaussiansplat")) {
@@ -176,10 +177,10 @@ export async function createLayerFromItemId(
         const layer = new IntegratedMesh3DTilesLayer({ portalItem: { id: itemId } as any });
         if (title) layer.title = title;
         return layer;
-      }
     }
   } catch {
     // Fall through to SDK default
+    console.warn("[layerFactory] Item metadata fetch failed for", itemId, "— falling back to SDK default");
   }
 
   // Default: let the SDK handle it

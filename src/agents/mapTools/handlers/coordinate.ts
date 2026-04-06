@@ -1,6 +1,7 @@
 import { getCurrentView, onViewChange } from "../../../utils/viewManager";
 import { setLastAssistantGeoSnapshot } from "../../../utils/assistantState";
 import { clearClickHandler as clearImageryClickHandler } from "./imagery";
+import { withTimeout } from "../../../utils/safeFetch";
 import * as webMercatorUtils from "@arcgis/core/geometry/support/webMercatorUtils";
 import Graphic from "@arcgis/core/Graphic";
 import Point from "@arcgis/core/geometry/Point";
@@ -87,7 +88,7 @@ export async function coordinateHandler(text: string): Promise<{ outputMessage: 
             url: "https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer",
           });
           const queryPoint = new Point({ latitude: lat, longitude: lon });
-          const result = await terrainLayer.queryElevation(queryPoint);
+          const result = await withTimeout(terrainLayer.queryElevation(queryPoint), 15000, "Query terrain elevation");
           elevation = (result as any).geometry?.z ?? null;
           console.log(`[Coordinates] Elevation: ${elevation?.toFixed(1)}m`);
         } catch (err) {
@@ -114,9 +115,9 @@ export async function coordinateHandler(text: string): Promise<{ outputMessage: 
           view.graphics.add(graphic);
           // Remove marker after 30 seconds
           setTimeout(() => {
-            try { view.graphics.remove(graphic); } catch { /* view may have changed */ }
+            try { view.graphics.remove(graphic); } catch (err) { console.warn("[Coordinates] Marker cleanup failed:", err); }
           }, 30000);
-        } catch { /* non-critical */ }
+        } catch (err) { console.warn("[Coordinates] Marker creation failed:", err); }
 
         // Store in assistant state for MCP follow-up queries
         setLastAssistantGeoSnapshot({

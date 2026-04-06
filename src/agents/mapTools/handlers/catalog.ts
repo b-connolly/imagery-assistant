@@ -1,5 +1,6 @@
 import { getCurrentView, getMapSceneElement, onViewChange } from "../../../utils/viewManager";
 import { findLayerByTitle, elapsed } from "../../../utils/agentHelpers";
+import { withTimeout } from "../../../utils/safeFetch";
 
 // ── Active panel tracking ───────────────────────────────────────────────────
 
@@ -8,7 +9,7 @@ let activeCatalogLayer: any = null;
 
 function clearPanel(): boolean {
   if (!activePanel) return false;
-  try { activePanel.remove(); } catch { /* already removed */ }
+  try { activePanel.remove(); } catch (err) { console.warn("[Catalog] Panel cleanup failed:", err); }
   activePanel = null;
   activeCatalogLayer = null;
   return true;
@@ -58,7 +59,7 @@ async function queryItemTypes(catalogLayer: any): Promise<ItemTypeInfo[]> {
   query.groupByFieldsForStatistics = ["cd_itemtype"];
   query.orderByFields = ["type_count DESC"];
 
-  const result = await catalogLayer.queryFeatures(query);
+  const result = await withTimeout(catalogLayer.queryFeatures(query), 30000, "Query catalog item types") as any;
   return result.features
     .map((f: any) => ({
       type: f.attributes.cd_itemtype as string,

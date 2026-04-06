@@ -69,8 +69,8 @@ export async function zoomToLayerExtent(activeView: any, target: any): Promise<s
   if (typeof target.load === "function" && target.loadStatus !== "loaded") {
     try {
       await withTimeout(target.load(), 30000, `Load "${target.title}"`);
-    } catch {
-      /* continue */
+    } catch (err) {
+      console.warn("[ZoomTo] Layer load failed (continuing):", err);
     }
   }
 
@@ -93,8 +93,8 @@ export async function zoomToLayerExtent(activeView: any, target: any): Promise<s
           "queryExtent"
         );
         zoomExtent = result?.extent;
-      } catch {
-        /* timeout or error */
+      } catch (err) {
+        console.warn("[ZoomTo] queryExtent failed:", err);
       }
     }
   }
@@ -105,8 +105,8 @@ export async function zoomToLayerExtent(activeView: any, target: any): Promise<s
       if (!lv?.fullExtent)
         await new Promise((r) => setTimeout(r, 500));
       zoomExtent = lv?.fullExtent || target.fullExtent;
-    } catch {
-      /* continue */
+    } catch (err) {
+      console.warn("[ZoomTo] whenLayerView fallback failed:", err);
     }
   }
 

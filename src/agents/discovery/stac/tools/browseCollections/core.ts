@@ -3,6 +3,7 @@ import {
   getStacCollections,
   type StacCollection,
 } from "../../../../../utils/stacClient";
+import { withTimeout } from "../../../../../utils/safeFetch";
 
 // ── Format helpers ──────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ export async function browseCollections(params: {
 
   let collections: StacCollection[];
   try {
-    collections = await getStacCollections(ep);
+    collections = await withTimeout(getStacCollections(ep), 30000, `Browse ${ep.name} collections`);
   } catch (err: any) {
     console.error("[StacSearch] Browse failed:", err);
     return `Failed to fetch collections from ${ep.name}: ${err?.message ?? String(err)}`;

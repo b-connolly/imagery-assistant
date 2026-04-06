@@ -64,18 +64,18 @@ async function addStacItemToMap(item: StacItem): Promise<string> {
     }
     // Has both COPC and COG — load the COG
     const cog = cogFallback[0];
-    const signedCogUrl = await signAssetUrl(cog[1].href, item.collection, lastStacEndpoint);
+    const signedCogUrl = await withTimeout(signAssetUrl(cog[1].href, item.collection, lastStacEndpoint), 15000, "Sign COG asset URL");
     return await loadCogAsset(signedCogUrl, title, item, t0);
   }
 
   if (best.type === "cog") {
-    const signedUrl = await signAssetUrl(best.asset.href, item.collection, lastStacEndpoint);
+    const signedUrl = await withTimeout(signAssetUrl(best.asset.href, item.collection, lastStacEndpoint), 15000, "Sign COG asset URL");
     return await loadCogAsset(signedUrl, title, item, t0);
   }
 
   // Other asset type — try loading as COG anyway (common for unlabeled GeoTIFFs)
   if (best.asset.href.match(/\.tiff?$/i)) {
-    const signedUrl = await signAssetUrl(best.asset.href, item.collection, lastStacEndpoint);
+    const signedUrl = await withTimeout(signAssetUrl(best.asset.href, item.collection, lastStacEndpoint), 15000, "Sign TIFF asset URL");
     return await loadCogAsset(signedUrl, title, item, t0);
   }
 
@@ -101,7 +101,7 @@ async function loadCogAsset(
     if (extent) {
       try {
         await view.goTo(extent, { duration: 2000 });
-      } catch { /* non-critical */ }
+      } catch (err) { console.warn("[StacSearch] goTo extent failed:", err); }
     }
 
     const time = elapsed(t0);

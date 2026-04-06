@@ -4,6 +4,7 @@ import Portal from "@arcgis/core/portal/Portal.js";
 import PortalFolder from "@arcgis/core/portal/PortalFolder.js";
 import type MapView from "@arcgis/core/views/MapView";
 import type SceneView from "@arcgis/core/views/SceneView";
+import { safeFetchJson } from "./safeFetch";
 
 export interface FolderInfo {
   id: string;
@@ -27,9 +28,13 @@ export async function listUserFolders(): Promise<FolderInfo[]> {
     try {
       const token = (await import("@arcgis/core/identity/IdentityManager")).default
         .findCredential(`${portal.url}/sharing`)?.token ?? "";
-      const url = `${portal.url}/sharing/rest/content/users/${encodeURIComponent(user.username)}?f=json&token=${encodeURIComponent(token)}`;
-      const resp = await fetch(url);
-      const data = await resp.json();
+      const url = `${portal.url}/sharing/rest/content/users/${encodeURIComponent(user.username)}`;
+      const form = new FormData();
+      form.append("f", "json");
+      form.append("token", token);
+      const data = await safeFetchJson<{ folders?: { id: string; title: string }[] }>(
+        url, { method: "POST", body: form }
+      );
       return (data.folders ?? []).map((f: any) => ({ id: f.id, title: f.title }));
     } catch {
       return [];
@@ -55,8 +60,9 @@ export async function createFolder(folderName: string): Promise<string> {
   form.append("token", token);
   form.append("title", folderName);
 
-  const resp = await fetch(url, { method: "POST", body: form });
-  const data = await resp.json();
+  const data = await safeFetchJson<{ success?: boolean; folder?: { id: string }; error?: { message: string } }>(
+    url, { method: "POST", body: form }
+  );
   if (!data?.success || !data?.folder?.id) {
     throw new Error(data?.error?.message ?? "Failed to create folder");
   }

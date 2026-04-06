@@ -9,8 +9,8 @@ function clearSwipe(): boolean {
   if (!activeSwipeElement) return false;
   try {
     activeSwipeElement.remove();
-  } catch {
-    // Element may already be removed
+  } catch (err) {
+    console.warn("[Swipe] Element cleanup failed:", err);
   }
   activeSwipeElement = null;
   return true;
@@ -186,8 +186,8 @@ export async function swipeHandler(text: string): Promise<{ outputMessage: strin
           try {
             el.startLayers = [startLayer];
             el.endLayers = [endLayer];
-          } catch {
-            // Fallback: try setting via the widget property
+          } catch (err) {
+            console.warn("[Swipe] Direct layer assignment failed, trying widget fallback:", err);
             try {
               if (el.widget) {
                 el.widget.leadingLayers.add(startLayer);

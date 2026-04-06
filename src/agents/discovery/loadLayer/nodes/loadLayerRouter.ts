@@ -42,7 +42,8 @@ export async function loadLayerRouter(
         outputMessage: `Switched to ${targetType.toUpperCase()} view.`,
         routerHandled: true,
       };
-    } catch {
+    } catch (err) {
+      console.warn("[LoadLayerRouter] View switch failed:", err);
       return {
         outputMessage: `Failed to switch to ${targetType.toUpperCase()}. Please use the 2D/3D toggle.`,
         routerHandled: true,

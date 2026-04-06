@@ -30,6 +30,39 @@ export async function mapToolsNode(s: MapToolsStateType, config?: RunnableConfig
     }
   }
 
+  // Capabilities / help — answer before any handler tries to run
+  if (AGENT_KEYWORDS.capabilities.test(text)) {
+    return {
+      outputMessage:
+        "Here's what I can help you with:\n\n" +
+        "**Search & Discovery**\n" +
+        "- Search ArcGIS Online, your organization, or Living Atlas for layers and services\n" +
+        "- Search STAC catalogs (Earth Search, Planetary Computer) for satellite imagery like Sentinel-2, Landsat, and NAIP\n\n" +
+        "**Layer Management**\n" +
+        "- Load layers by name, URL, or item ID and zoom to them\n" +
+        "- List, describe, and inspect layer metadata, fields, and statistics\n" +
+        "- Remove layers or clear the map\n\n" +
+        "**Imagery & Visualization**\n" +
+        "- Apply processing templates (NDVI, Hillshade, Slope, Color IR, and more)\n" +
+        "- Change stretch renderers and color ramps\n" +
+        "- Identify pixel values by clicking the map\n\n" +
+        "**Measurement & Analysis**\n" +
+        "- Measure distance, area, and volume\n" +
+        "- Generate elevation profiles and cross-sections\n" +
+        "- Calculate cut/fill and stockpile volumes (3D)\n\n" +
+        "**3D Tools**\n" +
+        "- Fix elevation offsets for meshes, splats, and scene layers\n" +
+        "- Visualize and filter point clouds by classification, elevation, or intensity\n\n" +
+        "**Compare & Explore**\n" +
+        "- Swipe between two layers to compare them side by side\n" +
+        "- Open the Oriented Imagery Viewer for oblique and 360° photos\n" +
+        "- Browse and filter Catalog Layer contents\n\n" +
+        "**Save**\n" +
+        "- Save your work as a web map or web scene to ArcGIS Online\n\n" +
+        "Try asking something like *\"Search for Sentinel-2 imagery over Denver\"* or *\"Apply NDVI to the imagery layer\"*.",
+    };
+  }
+
   // Route to handlers based on intent keywords
   // Check more specific patterns first, then broader ones
   if (/\b(save)\s+(web\s*map|web\s*scene|map|scene)\b/i.test(text)) return saveHandler(text);

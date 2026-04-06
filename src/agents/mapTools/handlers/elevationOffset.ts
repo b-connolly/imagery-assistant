@@ -155,8 +155,9 @@ export async function elevationOffsetHandler(text: string): Promise<{ outputMess
   if (getCurrentViewType() !== "3d") {
     console.log("[ElevOffset] Switching to 3D view...");
     try {
-      await requestViewSwitch("3d");
-    } catch {
+      await withTimeout(requestViewSwitch("3d"), 30000, "Switch to 3D for elevation offset");
+    } catch (err) {
+      console.warn("[ElevOffset] 3D switch failed:", err);
       return {
         outputMessage:
           "Could not switch to 3D view. Please switch to 3D using the toggle, then ask me again.",
@@ -282,7 +283,7 @@ export async function elevationOffsetHandler(text: string): Promise<{ outputMess
               ground.queryElevation(clickPoint), 15000, "Query terrain at click"
             ) as any;
             terrainZ = elevResult.geometry?.z ?? 0;
-          } catch { /* use 0 */ }
+          } catch (err) { console.warn("[ElevOffset] Click terrain query failed, using 0:", err); }
         }
 
         // 3. Compute offset
@@ -375,7 +376,7 @@ export async function elevationOffsetHandler(text: string): Promise<{ outputMess
         const pt = new Point({ x: cx, y: cy, spatialReference: fullExtent.spatialReference });
         const elevResult = await withTimeout(ground.queryElevation(pt), 15000, "Query terrain at layer center") as any;
         terrainZ = elevResult.geometry?.z ?? 0;
-      } catch { /* use 0 */ }
+      } catch (err) { console.warn("[ElevOffset] Calculate terrain query failed, using 0:", err); }
     }
 
     // hitTest at screen center of the layer to find layer surface Z
@@ -391,7 +392,7 @@ export async function elevationOffsetHandler(text: string): Promise<{ outputMess
           layerZ = hit.mapPoint.z ?? null;
         }
       }
-    } catch { /* continue */ }
+    } catch (err) { console.warn("[ElevOffset] Calculate hitTest failed:", err); }
 
     const mode = currentElevInfo?.mode ?? "not set";
     const lines: string[] = [
@@ -436,8 +437,8 @@ export async function elevationOffsetHandler(text: string): Promise<{ outputMess
 
     try {
       if (layer.fullExtent) await view.goTo(layer.fullExtent, { duration: 2000 });
-    } catch {
-      // Non-critical
+    } catch (err) {
+      console.warn("[ElevOffset] goTo after set-offset failed:", err);
     }
 
     const elapsedTime = elapsed(t0);
@@ -559,8 +560,8 @@ export async function elevationOffsetHandler(text: string): Promise<{ outputMess
 
   try {
     await view.goTo(layer.fullExtent, { duration: 2000 });
-  } catch {
-    // Non-critical
+  } catch (err) {
+    console.warn("[ElevOffset] goTo after auto-fix failed:", err);
   }
 
   const elapsedTime = elapsed(t0);

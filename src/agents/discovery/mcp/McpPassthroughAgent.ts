@@ -534,7 +534,8 @@ async function listHubServers(endpointUrl: string): Promise<HubServerSummary[]> 
       : [];
     hubServersCache.set(cacheKey, { servers, at: Date.now() });
     return servers;
-  } catch {
+  } catch (err) {
+    console.warn("[MCP] Hub servers fetch failed:", err);
     return [];
   } finally {
     endMcpAbortController(controller);
@@ -601,7 +602,9 @@ export async function refreshMcpAgentDescription(assistant: HTMLElement): Promis
         description: buildDescriptionFromTools(tools, serverName, hubServers),
       };
     }
-  } catch {}
+  } catch (err) {
+    console.warn("[MCP] Agent description refresh failed:", err);
+  }
 }
 
 function normalizeMessages(messages: any): any[] {
@@ -941,7 +944,8 @@ export function registerMcpPassthroughAgent(
         const lastAiMessage = getLastAiMessage(messages);
         if (!lastAiMessage) return "respond";
         return lastAiMessage.tool_calls?.length ? "tools" : "respond";
-      } catch {
+      } catch (err) {
+        console.warn("[MCP] Route-after-agent failed:", err);
         return "respond";
       }
     }
@@ -1021,7 +1025,8 @@ export function registerMcpPassthroughAgent(
             }
 
             await renderMcpGeoEntities(entities);
-          } catch {
+          } catch (err) {
+            console.warn("[MCP] Geo entity rendering failed:", err);
           }
         })();
       }, 0);
