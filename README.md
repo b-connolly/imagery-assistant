@@ -2,12 +2,6 @@
 
 An AI-powered geospatial assistant built with ArcGIS Maps SDK for JavaScript v5, ArcGIS AI Assistant components, and custom LangGraph agents. Search, load, visualize, analyze, and save geospatial content through natural language.
 
-## Demo
-
-A live demo is hosted on AWS S3: **[Imagery Data Assistant Demo](https://esri-imagery-apps.s3.dualstack.us-west-1.amazonaws.com/apps/imagery-assistant/index.html)**
-
-Sign in with your ArcGIS Online account to explore the full capabilities.
-
 ## Acknowledgments
 
 This project was inspired by and built upon the foundational work of [ralouta/ArcGIS-JavaScript-AI-Component](https://github.com/ralouta/ArcGIS-JavaScript-AI-Component). That project demonstrated how to integrate ArcGIS AI Assistant components with custom agents in a React application and served as the starting point for this imagery-focused extension.
